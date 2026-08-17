@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Gólem Őr — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#0d9488" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#0d9488" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="405" y="290" width="190" height="220" rx="40"/>
+    <path d="M455 380 H545 M470 450 H530"/>
+    <path d="M260 820 C260 560 370 480 500 480 C630 480 740 560 740 820 L740 1060 L260 1060 Z"/>
+    <path d="M330 600 L300 540 M670 600 L700 540"/>
+    <path d="M440 640 L440 900 M560 640 L560 900"/>
+  </g>
+  <circle cx="500" cy="225" r="8" fill="#0d9488"/>
+  <circle cx="500" cy="930" r="9" fill="#0d9488" opacity="0.8"/>
+</svg>

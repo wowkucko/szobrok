@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Ork Harcos — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#059669" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#059669" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="500" cy="350" rx="95" ry="100"/>
+    <path d="M420 300 L360 240 M580 300 L640 240"/>
+    <path d="M270 820 C270 560 380 480 500 480 C620 480 730 560 730 820 L730 1060 L270 1060 Z"/>
+    <path d="M270 780 L220 1010 M730 780 L780 1010"/>
+    <path d="M350 1060 L350 1130 M650 1060 L650 1130"/>
+  </g>
+  <circle cx="500" cy="215" r="8" fill="#059669"/>
+</svg>

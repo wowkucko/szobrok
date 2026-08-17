@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#d97706" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#d97706" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="500" cy="430" rx="95" ry="115"/>
+    <path d="M250 990 C250 710 370 610 500 610 C630 610 750 710 750 990 Z"/>
+    <path d="M350 1055 H650"/>
+    <path d="M300 1115 H700"/>
+  </g>
+  <circle cx="500" cy="255" r="8" fill="#d97706"/>
+</svg>

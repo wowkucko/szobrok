@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Űrkutató Vándor — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#0ea5e9" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#0ea5e9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="500" cy="330" r="85"/>
+    <path d="M500 245 L500 205"/>
+    <path d="M300 800 C300 570 390 490 500 490 C610 490 700 570 700 800 L700 1060 L300 1060 Z"/>
+    <path d="M340 580 L300 520 M660 580 L700 520"/>
+    <path d="M500 490 L500 1060"/>
+    <path d="M320 820 L240 880 M680 820 L760 880"/>
+  </g>
+  <circle cx="500" cy="195" r="8" fill="#0ea5e9"/>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Festés közeli — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1917"/>
+      <stop offset="1" stop-color="#0c0a09"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.55">
+      <stop offset="0" stop-color="#d97706" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#d97706" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="500" cy="620" rx="220" ry="280"/>
+    <path d="M330 560 C380 540 420 580 470 550 C520 520 560 570 610 540 C660 510 700 560 730 530"/>
+    <path d="M360 700 C410 680 450 720 500 690 C550 660 590 710 640 680"/>
+    <path d="M440 830 C470 810 510 840 550 815"/>
+  </g>
+  <circle cx="500" cy="300" r="9" fill="#d97706"/>
+  <circle cx="700" cy="420" r="6" fill="#d97706"/>
+</svg>

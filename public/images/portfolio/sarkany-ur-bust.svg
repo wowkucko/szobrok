@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Sárkány Úr bust — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#dc2626" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#dc2626" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="500" cy="420" rx="105" ry="125"/>
+    <path d="M410 320 L380 220 L450 295"/>
+    <path d="M590 320 L620 220 L550 295"/>
+    <path d="M250 990 C250 700 370 600 500 600 C630 600 750 700 750 990 Z"/>
+    <path d="M430 500 L430 560 L465 600"/>
+    <path d="M570 500 L570 560 L535 600"/>
+  </g>
+  <circle cx="500" cy="250" r="8" fill="#dc2626"/>
+  <circle cx="500" cy="390" r="10" fill="#dc2626" opacity="0.7"/>
+</svg>

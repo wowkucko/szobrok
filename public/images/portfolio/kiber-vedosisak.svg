@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Kiber Védősisak — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M390 470 C390 290 440 250 500 250 C560 250 610 290 610 470 Z"/>
+    <path d="M420 400 C440 360 470 350 500 350 C530 350 560 360 580 400"/>
+    <path d="M250 990 C250 700 370 600 500 600 C630 600 750 700 750 990 Z"/>
+    <path d="M370 620 L340 540 M630 620 L660 540"/>
+  </g>
+  <circle cx="500" cy="200" r="8" fill="#3b82f6"/>
+</svg>

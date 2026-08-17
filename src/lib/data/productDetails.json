@@ -1,0 +1,245 @@
+{
+  "nekomata-kunoichi": {
+    "descriptionHtml": "<p>A Nekomata Kunoichi a japán folklór macskaszelleme és a nindzsa harcművészetek találkozása. A karakter arca nyugodt, mégis figyelmeztető — ahogy a legenda szerint a nekomata két farkat növeszt, úgy a figura vonalvezetése is kettős: kecses, mégis veszélyes íveket rajzol.</p><p>A festés során a legnagyobb kihívást a bőrárnyalatok áttűnései és a selyemruha fényvisszaverése jelentette. Több rétegben, légi ecsettel (airbrush) építettem fel a színátmeneteket, majd kézi ecsettel tettem hozzá a finom részleteket, mint a szempillák és a kimonó mintái.</p><p><strong>Kiállítási tipp:</strong> különösen jól mutat meleg tónusú LED pontfény alatt, amely kiemeli a selyemruha sötét-világos játékát és a kardélen megcsillanó fényt.</p>",
+    "videoUrl": "https://www.w3schools.com/html/mov_bbb.mp4",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 14,
+    "depthCm": 12,
+    "scale": "1:8",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/nekomata-kunoichi.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "cyberpunk-ronin": {
+    "descriptionHtml": "<p>A Cyberpunk Ronin egy magányos harcos a neonfényes metropoliszban — a szamuráj hagyomány és a cyberpunk esztétika fúziója. A katanát markoló kéz, a szélben lobogó kabát és a sisakba épített optikai egység egy pillanatnyi csendet ragad meg a káosz előtt.</p><p>A festés lelke a NMM (non-metallic metal) technika: az acélt és a neont nem fémes pigmentekkel, hanem akril árnyalatok egymásra építésével festettem meg, így a felület irányfüggő fényt ad vissza. A neonzöld kiemelések UV-fényben enyhén világítanak.</p><p><strong>Kiállítási tipp:</strong> sötét háttér előtt, hideg-kék fénnyel megvilágítva a neonrészletek szinte „bekapcsolnak”.</p>",
+    "videoUrl": "https://www.w3schools.com/html/mov_bbb.mp4",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 22,
+    "depthCm": 20,
+    "scale": "1:6",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/cyberpunk-ronin.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "sarkany-ur-bust": {
+    "descriptionHtml": "<p>A Sárkány Úr egy ősi, tüzet lehelő hatalmasság, akinek tekintete száz év csatáját idézi. A bust formátum a fejre és a felsőtestre fókuszál, így a pikkelyek, a szarvak és az izzó torkolat mind-mind főszereplővé válhatnak.</p><p>Az OSL (object source lighting) fényhatás a torkából áradó tüzet vetíti a pofára és a pikkelyekre — ez a legnehezebb festési feladat, mert a fény irányának végig következetesnek kell maradnia. A pikkelyeket több rétegben, lazúrozással (glazing) mélyítettem el.</p><p><strong>Kiállítási tipp:</strong> alacsony, meleg fényforrás a figura alól kiemeli az OSL hatást és a szarvak mögötti árnyékokat.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 18,
+    "depthCm": 16,
+    "scale": "1:8",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/sarkany-ur-bust.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "tuzvarazslo": {
+    "descriptionHtml": "<p>A Tűzvarázsló egy pillanat alatt megidézett, felkorbácsolt erő — a köpenye mögött lángnyelvek kavarognak, kezében a mágiát izzó gömb formálja. A dinamikus póz a mozgás illúzióját kelti, mintha a következő pillanatban tűzvihar törne elő.</p><p>A festés kontrasztokra épül: a tűz vakító sárgái és narancsai mellett a köpeny mély bíbor és szénfekete árnyalatokat kapott. A lángmintákat szabadkézzel, vékony ecsettel rajzoltam fel a textilre.</p><p><strong>Kiállítási tipp:</strong> a figura meleg fénnyel, sötét háttér előtt a leghatásosabb — a fényforrást a „tűzgömb” magasságába helyezd.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 14,
+    "depthCm": 14,
+    "scale": "1:10",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/tuzvarazslo.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "ork-harcos": {
+    "descriptionHtml": "<p>Az Ork Harcos a játékasztalok örök klasszikusa: masszív vállak, rozsdás penge és a csata utáni fáradt, mégis elszánt tekintet. Ez a darab arra készült, hogy a gyűjtemény hangulatát adja, és azonnal játszható legyen.</p><p>Az asztalkész (tabletop-ready) minőség ellenére a bőrtónusokba és a fémekbe időt fektettem: a zöld bőr aláfestésétől a rozsda foltjain át a pengék élkiemeléséig minden réteg a tartósságot és a karaktert szolgálja.</p><p><strong>Kiállítási tipp:</strong> a bázis kőzetei és a kis mohafoltok nagyon jól mutatnak természetes fényben, egy faasztalon.</p>",
+    "materials": [
+      "PLA/PETG filament (FDM nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "Matt védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "FDM (0.08 mm)",
+    "widthCm": 10,
+    "depthCm": 10,
+    "scale": "1:10",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/ork-harcos.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "urokutato-vandor": {
+    "descriptionHtml": "<p>Az Űrkutató Vándor a csillagközi határvidék felfedezője: ruházata rétegesen épül fel, mintha évtizedek utazásait viselné. A figura a felfedezés nyugodt, mégis eltökélt pillanatát örökíti meg.</p><p>A festés a fehér-vörös kontrasztra épül, ami a sci-fi ikonográfiát idézi, miközben a szövetek matt-selyem textúrája természetesnek hat. A sisak és a csövek fémes részleteit kézi kiemeléssel tettem hangsúlyossá.</p><p><strong>Kiállítási tipp:</strong> semleges szürke háttér és egyetlen irányított fény a legjobb módja annak, hogy a fehér felületek plasztikusan jelenjenek meg.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 12,
+    "depthCm": 10,
+    "scale": "1:10",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/urokutato-vandor.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "android-fej-bust": {
+    "descriptionHtml": "<p>Az Android Fej egy limitált szériás cyberpunk bust, amely a gép és az ember határát feszegeti. A koponya felületén futó kábelek, a panelvarratok és a törött vizor egy történetet sejtet: mi történt vele, és ki volt?</p><p>Mivel a felület „masinás”, a festés fő kihívása a mattság és a fémesség váltakozó játéka volt: a karcos fémeket száraz ecseteléssel (dry brushing) emeltem ki, a paneleket pedig matt lakkal zártam le, hogy ne tükröződjenek.</p><p><strong>Kiállítási tipp:</strong> egyetlen, felülről érkező erős fény kiemeli a kábelek árnyékait és a panel mélységeit.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 9,
+    "depthCm": 9,
+    "scale": "1:10",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/android-fej-bust.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "szerafin-angyal": {
+    "descriptionHtml": "<p>A Szerafin Angyal egy nagyméretű, 1:6 méretarányú figura, amely a fény és a nyugalom szobrát idézi. A kiterjesztett szárnyak aranyozott tollai mind-mind kézzel kaptak fényt, így a figura a fény irányától függően változtatja az arcát.</p><p>A festés talán a projekt leghosszabb folyamata volt: a szárnyak tollazatát egyenként, lazúrrétegekben festettem, hogy a fehér és az arany áttűnései éteri hatást keltsenek. A ruha drapériái mély kék-ibolya árnyalatokban futnak össze.</p><p><strong>Kiállítási tipp:</strong> a figura felülről, meleg fénnyel megvilágítva a legszebb — a szárnyak ilyenkor „megvilágosodnak”.</p>",
+    "videoUrl": "https://www.w3schools.com/html/mov_bbb.mp4",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 26,
+    "depthCm": 18,
+    "scale": "1:6",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/szerafin-angyal.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "zombi-apokalipszis": {
+    "descriptionHtml": "<p>A Zombi Apokalipszis egy sötét hangulatú dioráma-miniatűr: a rozsdás korlát, a töredezett beton és a feltartott karok egyetlen feszült pillanatot rögzítenek. A bázis maga is történetet mesél — a romok között eldobált tárgyakkal.</p><p>Az asztalkész minőségű festés ellenére a bőr sápadtságát és a sebek színét gondosan rétegeztem, a betont pedig száraz ecseteléssel és pigmentporral tettem „porossá”.</p><p><strong>Kiállítási tipp:</strong> gyenge, hideg fény alatt a legnyomasztóbb a hangulat — a dioráma árnyékai ilyenkor mélyek maradnak.</p>",
+    "materials": [
+      "PLA/PETG filament (FDM nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "Matt védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "FDM (0.08 mm)",
+    "widthCm": 8,
+    "depthCm": 8,
+    "scale": "1:24",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/zombi-apokalipszis.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "golem-or": {
+    "descriptionHtml": "<p>A Gólem Őr egy ősi, kőből életre keltett őrszem: szemeiben nincs érzelem, csak a feladat. A masszív vállak, a repedezett kőfelület és a mellkasába ágyazott, fényt árasztó ereklye egyetlen, lenyűgöző sziluetté áll össze.</p><p>A kő textúráját többféle technikával építettem fel: a repedéseket finom ecsettel rajzoltam, a felületet pedig lazúrozással és száraz ecseteléssel „viseltessé” tettem. Az ereklye OSL fényhatása zöldesen izzik a kő repedéseiben.</p><p><strong>Kiállítási tipp:</strong> sötét sarokban, alacsony fénnyel a gólem szinte „él” — az ereklye fénye ilyenkor a leghatásosabb.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 20,
+    "depthCm": 18,
+    "scale": "1:6",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/golem-or.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "kiber-vedosisak": {
+    "descriptionHtml": "<p>A Kiber Védősisak egy futurisztikus bust, amely egy ismeretlen világ katonájának fejvédelmét mintázza. A sisak ívei, a karcos fém felületek és a matt-selyem kombinált lakkozás egy rendkívül letisztult, mégis technológiai hatást keltő darabot alkot.</p><p>A festés során a karcokra és a kopásnyomokra fektettem a hangsúlyt: ezek adják a sisak „használt” karakterét. A színek visszafogottak — a hideg acélszürke és a mélykék dominál —, így a forma a főszereplő.</p><p><strong>Kiállítási tipp:</strong> egyetlen irányított, hideg fény és sötét háttér mellett a sisak szinte „repül” a térben.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 10,
+    "depthCm": 10,
+    "scale": "1:8",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/kiber-vedosisak.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  },
+  "ej-kiralyno": {
+    "descriptionHtml": "<p>Az Éj Királynő az éjszaka uralkodója: bársonyos, mély árnyalatai és a ruháját díszítő finom aranyminták egy eleganciába burkolt, mégis félelmetes jelenlétet sugároznak. A figura a sötét fantasy hangulatát hozza a gyűjteménybe.</p><p>A ruházat aranymintáit szabadkézzel, hajszálvékony ecsettel festettem — ez volt a legtöbb türelmet igénylő rész. A bársony hatást matt-selyem lakkkombinációval értem el: a sötét részek mélyek maradnak, a fényes kiemelések pedig finoman csillannak.</p><p><strong>Kiállítási tipp:</strong> meleg, alacsony szögű fény alatt az aranyminták megélénkülnek, a bársony pedig mély árnyékokat vet.</p>",
+    "materials": [
+      "Prémium ABS-like műgyanta (8K MSLA nyomtatás)",
+      "Vallejo & Citadel akril festékek",
+      "UV-álló szatén védőlakk",
+      "Kétkomponensű epoxy ragasztó"
+    ],
+    "printTechnology": "MSLA Resin (12K)",
+    "widthCm": 15,
+    "depthCm": 13,
+    "scale": "1:10",
+    "scaleComparisonObject": "fél literes üdítős PET palack",
+    "gallery": [
+      "/images/portfolio/ej-kiralyno.svg",
+      "/images/portfolio/detail-angle.svg",
+      "/images/portfolio/detail-texture.svg",
+      "/images/portfolio/detail-base.svg"
+    ]
+  }
+}

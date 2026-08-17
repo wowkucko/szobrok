@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Talpazat — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.78" r="0.5">
+      <stop offset="0" stop-color="#d97706" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#d97706" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M330 600 C330 470 400 410 500 410 C600 410 670 470 670 600 L670 900 L330 900 Z"/>
+    <ellipse cx="500" cy="900" rx="230" ry="60"/>
+    <ellipse cx="500" cy="985" rx="270" ry="70"/>
+    <path d="M500 900 L500 985 M270 900 L230 985 M730 900 L770 985"/>
+    <path d="M500 410 L500 985"/>
+    <path d="M380 640 L380 700 M620 640 L620 700"/>
+  </g>
+  <circle cx="500" cy="1120" r="8" fill="#d97706"/>
+</svg>

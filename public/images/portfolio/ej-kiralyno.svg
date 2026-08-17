@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1250" role="img" aria-label="Éj Királynő — helykitöltő kép">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18181b"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.5">
+      <stop offset="0" stop-color="#e11d48" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#e11d48" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1000" height="1250" fill="url(#bg)"/>
+  <rect width="1000" height="1250" fill="url(#glow)"/>
+  <g stroke="#a1a1aa" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="500" cy="370" rx="85" ry="105"/>
+    <path d="M430 295 L450 245 L480 295"/>
+    <path d="M570 295 L550 245 L520 295"/>
+    <path d="M320 800 C320 560 400 480 500 480 C600 480 680 560 680 800 C680 940 620 1060 500 1060 C380 1060 320 940 320 800 Z"/>
+    <path d="M350 800 C420 760 580 760 650 800"/>
+    <path d="M380 700 L340 620 M620 700 L660 620"/>
+  </g>
+  <circle cx="500" cy="215" r="8" fill="#e11d48"/>
+</svg>
