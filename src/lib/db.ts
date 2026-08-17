@@ -156,6 +156,25 @@ const FEED_SCHEMA = `
   )
 `;
 
+const MESSAGES_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    product_id TEXT NOT NULL DEFAULT '',
+    product_title TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    offer INTEGER,
+    message TEXT NOT NULL DEFAULT '',
+    attachment_name TEXT NOT NULL DEFAULT '',
+    attachment_type TEXT NOT NULL DEFAULT '',
+    attachment_path TEXT NOT NULL DEFAULT '',
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )
+`;
+
 const UPSERT_FEED_SQL = `
   INSERT INTO feed_entries (
     product_id, feed_id, title, description, availability, condition, price,
@@ -278,6 +297,7 @@ function getDb(): DatabaseSync {
   db = new DatabaseSync(DB_PATH);
   db.exec(SCHEMA);
   db.exec(FEED_SCHEMA);
+  db.exec(MESSAGES_SCHEMA);
   // A korábbi verzió custom_fields oszlopát eltávolítjuk, ha még megvan
   // (a termékből származó mezőket már olvasáskor feloldjuk, nincs rá szükség).
   try {
@@ -1069,4 +1089,154 @@ export function getScaleOptions(): string[] {
       const num = (s: string) => parseFloat(s.split(":")[0]) || 0;
       return num(a) - num(b);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Üzenetek (a weboldal űrlapjai — nincs SMTP, minden az adatbázisba kerül)
+// ---------------------------------------------------------------------------
+
+/** A weboldali űrlap típusa, amiről az üzenet érkezett. */
+export type MessageType = "purchase" | "offer" | "contact";
+
+/** Egy beérkezett üzenet (vásárlási link kérés / ajánlat / kapcsolat). */
+export interface Message {
+  id: string;
+  type: MessageType;
+  productId: string;
+  productTitle: string;
+  name: string;
+  email: string;
+  phone: string;
+  /** Ajánlat összege (Ft) — csak ajánlat típusnál. */
+  offer: number | null;
+  message: string;
+  attachmentName: string;
+  attachmentType: string;
+  /** A melléklet URL-je (a letöltéshez), vagy üres ha nincs. */
+  attachmentUrl: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface MessageRow {
+  id: string;
+  type: MessageType;
+  product_id: string;
+  product_title: string;
+  name: string;
+  email: string;
+  phone: string;
+  offer: number | null;
+  message: string;
+  attachment_name: string;
+  attachment_type: string;
+  attachment_path: string;
+  is_read: number;
+  created_at: string;
+}
+
+function rowToMessage(r: MessageRow): Message {
+  return {
+    id: r.id,
+    type: r.type,
+    productId: r.product_id,
+    productTitle: r.product_title,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    offer: r.offer,
+    message: r.message,
+    attachmentName: r.attachment_name,
+    attachmentType: r.attachment_type,
+    attachmentUrl:
+      r.attachment_path && r.attachment_path !== ""
+        ? `/api/files/${encodeURIComponent(r.attachment_path)}`
+        : "",
+    isRead: r.is_read === 1,
+    createdAt: r.created_at,
+  };
+}
+
+const INSERT_MESSAGE_SQL = `
+  INSERT INTO messages (
+    id, type, product_id, product_title, name, email, phone, offer,
+    message, attachment_name, attachment_type, attachment_path, is_read, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+`;
+
+export interface MessageInput {
+  type: MessageType;
+  productId?: string;
+  productTitle?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  offer?: number | null;
+  message?: string;
+  attachmentName?: string;
+  attachmentType?: string;
+  /** A mentett melléklet fájlneve (a data/uploads alatt), vagy üres. */
+  attachmentPath?: string;
+}
+
+/** Új üzenet mentése az adatbázisba. Visszaadja az id-t. */
+export function createMessage(input: MessageInput): string {
+  const target = getDb();
+  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  target
+    .prepare(INSERT_MESSAGE_SQL)
+    .run(
+      id,
+      input.type,
+      input.productId ?? "",
+      input.productTitle ?? "",
+      input.name,
+      input.email,
+      input.phone ?? "",
+      input.offer ?? null,
+      input.message ?? "",
+      input.attachmentName ?? "",
+      input.attachmentType ?? "",
+      input.attachmentPath ?? "",
+      new Date().toISOString()
+    );
+  return id;
+}
+
+/** Minden üzenet, legújabb elöl. */
+export function getMessages(): Message[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM messages ORDER BY created_at DESC")
+    .all() as unknown as MessageRow[];
+  return rows.map(rowToMessage);
+}
+
+/** Egy üzenet részlete, vagy undefined ha nem létezik. */
+export function getMessage(id: string): Message | undefined {
+  const row = getDb()
+    .prepare("SELECT * FROM messages WHERE id = ?")
+    .get(id) as unknown as MessageRow | undefined;
+  return row ? rowToMessage(row) : undefined;
+}
+
+/** Olvasott / olvasatlan jelölés (az admin üzenetek listában). */
+export function setMessageRead(id: string, read: boolean): boolean {
+  const result = getDb()
+    .prepare("UPDATE messages SET is_read = ? WHERE id = ?")
+    .run(read ? 1 : 0, id);
+  return (result as { changes: number }).changes > 0;
+}
+
+/** Üzenet törlése. */
+export function deleteMessage(id: string): boolean {
+  const result = getDb().prepare("DELETE FROM messages WHERE id = ?").run(id);
+  return (result as { changes: number }).changes > 0;
+}
+
+/** Olvasatlan üzenetek száma (az admin fül jelvényéhez). */
+export function getUnreadMessageCount(): number {
+  const { count } = getDb()
+    .prepare("SELECT COUNT(*) AS count FROM messages WHERE is_read = 0")
+    .get() as unknown as { count: number };
+  return count;
 }

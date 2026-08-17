@@ -88,13 +88,20 @@ export default function About() {
             }`}
           >
             <p>
-              Tomi vagyok, 2024 óta foglalkozom figurafestéssel. A hobbim egy
-              Bambulab P1P FDM nyomtatóval indult, de a még magasabb szintű,
-              részletgazdag, gyűjtői minőségű szobrok megalkotásához később
-              beszereztem egy Elegoo Saturn 4 Ultra gyanta alapú nyomtatót is. A
-              digitális modellek kézzelfogható műalkotássá formálása adja
-              számomra azt az alkotói szabadságot, amiért teljesen
-              beleszerettem ebben a folyamatba.
+              2024 óta foglalkozom figurafestéssel. A hobbim egy Bambulab P1P
+              FDM nyomtatóval indult, de a még magasabb szintű, részletgazdag,
+              gyűjtői minőségű szobrok megalkotásához később beszereztem egy
+              Elegoo Saturn 4 Ultra gyanta alapú nyomtatót is. A digitális
+              modellek kézzelfogható műalkotássá formálása adja számomra azt az
+              alkotói szabadságot, amiért teljesen beleszerettem ebbe a
+              folyamatba.
+            </p>
+            <p>
+              Magamnak festem azokat a modelleket, amelyek igazán tetszenek —
+              minden darab úgy készül, ahogy otthon, a polcomon is szívesen
+              látnám. Az elkészült szobrok egy darabig nálam díszelgenek, de
+              sajnos a hely szűkös: így a kedvenceimnek is új otthont kell
+              keresnem, ezért kerülnek eladásra.
             </p>
             <p>
               A figurák életre keltése igazi szenvedély számomra, ahol a

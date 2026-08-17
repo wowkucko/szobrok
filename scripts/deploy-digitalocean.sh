@@ -94,7 +94,7 @@ else
   echo "    nano $APP_DIR/.env.local"
   echo ""
   echo "  Kötelező kitölteni: ADMIN_USERNAME, ADMIN_PASSWORD,"
-  echo "  NEXT_PUBLIC_SITE_URL=https://festettszobrok.com, és az SMTP-* mezők."
+  echo "  NEXT_PUBLIC_SITE_URL=https://festettszobrok.com."
   exit 1
 fi
 
@@ -153,7 +153,7 @@ else
   warn "A Certbot megpróbál SSL-t kérni. Ha a DNS (A rekord → $IP) még nem"
   warn "érvényes, ez hibát fog dobni — ilyenkor a beállítás után futtasd:"
   warn "  certbot --nginx -d ${DOMAIN} -d ${WWW_DOMAIN}"
-  certbot --nginx -d "$DOMAIN" -d "$WWW_DOMAIN" --non-interactive --agree-tos --redirect -m "hello@festettszobrok.com" || true
+  certbot --nginx -d "$DOMAIN" -d "$WWW_DOMAIN" --non-interactive --agree-tos --redirect -m "festettszobrokmuhelye@gmail.com" || true
 fi
 
 # ---------- 7. Tűzfal ----------

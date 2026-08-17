@@ -1,6 +1,6 @@
 export const SITE_NAME = "Festett Szobrok";
 
-export const CONTACT_EMAIL = "hello@festettszobrok.com";
+export const CONTACT_EMAIL = "festettszobrokmuhelye@gmail.com";
 
 export const NAV_LINKS = [
   { label: "Kiemeltek", href: "#galeria" },

@@ -155,6 +155,15 @@ export default function PickupMap({
     >
       <div ref={containerRef} className="h-full w-full" />
       <style>{`
+        /* A Leaflet belső panelei magas z-indexeket használnak (tile 200,
+           marker 600, popup 700). Stacking context nélkül ezek görgetéskor
+           a sticky menüsor (z-40) fölé kerülhetnek. Az izoláció a teljes
+           térképet egy alacsony, önálló rétegbe zárja. */
+        .pickup-map {
+          position: relative;
+          z-index: 0;
+          isolation: isolate;
+        }
         .pickup-map .leaflet-container {
           background: #18181b;
           font-family: inherit;

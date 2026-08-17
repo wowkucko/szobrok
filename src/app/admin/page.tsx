@@ -1,17 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Database, ImageOff, Plus, Rss } from "lucide-react";
+import {
+  ArrowLeft,
+  Database,
+  ImageOff,
+  Inbox,
+  Plus,
+  Rss,
+} from "lucide-react";
 import {
   getCategoryOptions,
   getFeedProductIds,
   getPriceRange,
   getProducts,
+  getUnreadMessageCount,
   parseProductQuery,
   queryProducts,
   type ProductQuery,
 } from "@/lib/db";
 import { brokenFeedImages } from "@/lib/feedImages";
 import AdminProductTable from "@/components/admin/AdminProductTable";
+import AdminMessages from "@/components/admin/AdminMessages";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -26,8 +35,11 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const params = await searchParams;
+  const tab = params.tab === "messages" ? "messages" : "products";
+
   // A szűrés/rendezés a URL-ből jön — megosztható, visszaállítható link
-  const filters: ProductQuery = parseProductQuery(await searchParams);
+  const filters: ProductQuery = parseProductQuery(params);
 
   // A feed-kép ellenőrzés és a számláló az ÖSSZES termékre vonatkozik,
   // függetlenül az aktív szűrőktől
@@ -38,6 +50,7 @@ export default async function AdminPage({
   const categoryOptions = getCategoryOptions();
 
   const { products, total, filtered, page, pageCount } = queryProducts(filters);
+  const unreadMessages = getUnreadMessageCount();
 
   // A feedben szereplő termékek képeinek ellenőrzése (a feedben megjelenő
   // URL-ek létező fájlra mutatnak-e).
@@ -111,26 +124,76 @@ export default async function AdminPage({
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <AdminProductTable
-          products={products}
-          total={total}
-          filtered={filtered}
-          page={page}
-          pageCount={pageCount}
-          feedIds={feedProductIds}
-          feedImageErrors={feedImageErrors}
-          filters={filters}
-          priceRange={priceRange}
-          categoryOptions={categoryOptions}
-        />
+      {/* Fülváltó: Termékek / Üzenetek */}
+      <div className="border-b border-zinc-800 bg-zinc-950">
+        <div className="mx-auto flex max-w-6xl gap-1 px-6">
+          <Link
+            href="/admin"
+            className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+              tab === "products"
+                ? "border-amber-500 text-amber-500"
+                : "border-transparent text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            <Database className="h-4 w-4" />
+            Termékek
+          </Link>
+          <Link
+            href="/admin?tab=messages"
+            className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+              tab === "messages"
+                ? "border-amber-500 text-amber-500"
+                : "border-transparent text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            <Inbox className="h-4 w-4" />
+            Üzenetek
+            {unreadMessages > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs font-semibold text-zinc-950">
+                {unreadMessages}
+              </span>
+            )}
+          </Link>
+        </div>
+      </div>
 
-        <p className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-xs leading-5 text-zinc-500">
-          Figyelem: a <code className="text-zinc-300">npm run seed</code>{" "}
-          futtatása felülírja az itt végzett módosításokat a JSON adatfájlokkal.
-          A szerkesztéshez használd ezt az oldalt, vagy szerkeszd a JSON
-          fájlokat és futtasd újra a seedet.
-        </p>
+      <main className="mx-auto max-w-6xl px-6 py-10">
+        {tab === "messages" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">
+              Beérkezett üzenetek
+            </h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              A vásárlási link kérések, árajánlatok és kapcsolatfelvételek az
+              adatbázisba érkeznek — itt tekintheted meg őket. Válaszolni nem
+              szükséges; az érdeklődő e-mail címét az üzenet részletei
+              tartalmazzák.
+            </p>
+            <AdminMessages />
+          </>
+        ) : (
+          <>
+            <AdminProductTable
+              products={products}
+              total={total}
+              filtered={filtered}
+              page={page}
+              pageCount={pageCount}
+              feedIds={feedProductIds}
+              feedImageErrors={feedImageErrors}
+              filters={filters}
+              priceRange={priceRange}
+              categoryOptions={categoryOptions}
+            />
+
+            <p className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 text-xs leading-5 text-zinc-500">
+              Figyelem: a <code className="text-zinc-300">npm run seed</code>{" "}
+              futtatása felülírja az itt végzett módosításokat a JSON adatfájlokkal.
+              A szerkesztéshez használd ezt az oldalt, vagy szerkeszd a JSON
+              fájlokat és futtasd újra a seedet.
+            </p>
+          </>
+        )}
       </main>
     </div>
   );

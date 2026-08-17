@@ -1,13 +1,15 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
-import { getSmtpConfig, isSmtpConfigured, sendMail } from "@/lib/mail";
+import { createMessage } from "@/lib/db";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB
+const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
-interface ContactPayload {
-  name: string;
-  email: string;
-  message: string;
-  attachment?: { name: string; type: string; data: string };
+/** Biztonságos kiterjesztés a mentett melléklethez. */
+function safeExt(name: string): string {
+  const ext = path.extname(name).toLowerCase();
+  return /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : "";
 }
 
 export async function POST(request: Request) {
@@ -35,8 +37,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Kérlek, írd le az üzeneted." }, { status: 400 });
   }
 
+  // Melléklet mentése a data/uploads mappába (msg- előtaggal), hogy a
+  // meglévő /api/files/ route kiszolgálhassa. Az eredeti név az adatbázisban
+  // marad, a lemezen biztonságos, egyedi név lesz.
   const file = form.get("attachment");
-  let attachment: ContactPayload["attachment"];
+  let attachmentName = "";
+  let attachmentType = "";
+  let attachmentPath = "";
   if (file && typeof file !== "string" && file.size > 0) {
     if (file.size > MAX_ATTACHMENT_BYTES) {
       return NextResponse.json(
@@ -45,104 +52,27 @@ export async function POST(request: Request) {
       );
     }
     const buffer = Buffer.from(await file.arrayBuffer());
-    attachment = {
-      name: file.name || "melleklet",
-      type: file.type || "application/octet-stream",
-      data: buffer.toString("base64"),
-    };
+    const ext = safeExt(file.name || "");
+    const stored = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+    mkdirSync(UPLOAD_DIR, { recursive: true });
+    writeFileSync(path.join(UPLOAD_DIR, stored), buffer);
+    attachmentName = file.name || "melleklet";
+    attachmentType = file.type || "application/octet-stream";
+    attachmentPath = stored;
   }
 
-  const payload: ContactPayload = {
+  createMessage({
+    type: "contact",
     name,
     email,
     message,
-    ...(attachment ? { attachment } : {}),
-  };
+    attachmentName,
+    attachmentType,
+    attachmentPath,
+  });
 
-  if (!isSmtpConfigured(getSmtpConfig())) {
-    return NextResponse.json(
-      {
-        error:
-          "Az e-mail küldés nincs beállítva. Kérlek, add meg az SMTP adatokat (.env.local: SMTP_HOST, SMTP_USER, SMTP_PASS).",
-      },
-      { status: 500 }
-    );
-  }
-
-  const escaped = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #b45309; margin-bottom: 16px;">Új egyedi ajánlatkérés</h2>
-      <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
-        <tr>
-          <td style="padding: 8px 0; color: #666; width: 120px;">Név</td>
-          <td style="padding: 8px 0;"><strong>${escaped(payload.name)}</strong></td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Válasz cím</td>
-          <td style="padding: 8px 0;">
-            <a href="mailto:${escaped(payload.email)}">${escaped(payload.email)}</a>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666;">Melléklet</td>
-          <td style="padding: 8px 0;">${
-            payload.attachment ? escaped(payload.attachment.name) : "—"
-          }</td>
-        </tr>
-        <tr>
-          <td style="padding: 8px 0; color: #666; vertical-align: top;">Üzenet</td>
-          <td style="padding: 8px 0; white-space: pre-wrap;">${escaped(
-            payload.message
-          )}</td>
-        </tr>
-      </table>
-      <p style="margin-top: 24px; font-size: 12px; color: #999;">
-        Ezt az e-mailt a weboldal kapcsolat űrlapjáról küldtük.
-      </p>
-    </div>`;
-
-  const text = [
-    "Új egyedi ajánlatkérés",
-    "",
-    `Név: ${payload.name}`,
-    `Válasz cím: ${payload.email}`,
-    `Melléklet: ${payload.attachment ? payload.attachment.name : "nincs"}`,
-    "",
-    payload.message,
-  ].join("\n");
-
-  try {
-    await sendMail({
-      replyTo: payload.email,
-      subject: `Új egyedi ajánlatkérés — ${payload.name}`,
-      text,
-      html,
-      ...(payload.attachment
-        ? {
-            attachments: [
-              {
-                filename: payload.attachment.name,
-                contentType: payload.attachment.type,
-                content: payload.attachment.data,
-                encoding: "base64",
-              },
-            ],
-          }
-        : {}),
-    });
-
-    return NextResponse.json(
-      { ok: true, message: "Ajánlatkérés elküldve." },
-      { status: 200 }
-    );
-  } catch (err) {
-    console.error("[contact] email küldési hiba:", err);
-    return NextResponse.json(
-      { error: "Az e-mail küldése közben hiba történt. Próbáld újra később." },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    { ok: true, message: "Ajánlatkérés rögzítve." },
+    { status: 200 }
+  );
 }
