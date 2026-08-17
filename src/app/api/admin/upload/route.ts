@@ -68,12 +68,13 @@ export async function POST(request: NextRequest) {
 
   // OG-kompatibilis (1200×630) PNG automatikus generálása minden képből,
   // hogy a megosztási meta mindig készen álljon. A név determinisztikus
-  // (og-<base>.png), így az oldal oldalról leképezhető rá.
+  // (og-v2-<base>.png — a v2 a figyelem-alapú vágást jelöli), így az oldal
+  // oldalról leképezhető rá.
   let ogUrl: string | null = null;
   if (isImage) {
     const ogData = await generateOgImage(data);
     if (ogData) {
-      const ogName = `og-${base}.png`;
+      const ogName = `og-v2-${base}.png`;
       writeFileSync(path.join(UPLOAD_DIR, ogName), ogData);
       ogUrl = `/api/files/${ogName}`;
     }

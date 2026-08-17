@@ -26,6 +26,28 @@ export default function About() {
     return () => clearInterval(timer);
   }, []);
 
+  // A nem aktív slide képeit nem töltjük be a betöltéskor (a három SVG
+  // együtt ~1,4 MB) — csak akkor fér hozzájuk a böngésző, amikor a szekció
+  // a képernyőhöz közelít, és a soron következőt ilyenkor előre is hozza.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        obs.disconnect();
+        // A láthatatlan slide-ok lazily töltődnek — a soron következőt
+        // előre hozzuk, hogy a váltás pillanatában ne legyen ugrás.
+        const next = ABOUT_IMAGES[(slide + 1) % ABOUT_IMAGES.length];
+        const img = new window.Image();
+        img.src = next;
+      },
+      { rootMargin: "600px 0px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [slide]);
+
   // Ha a szekció teljesen kikerült a képernyőről (tovább görgettél),
   // a kibontott szöveg automatikusan becsukódik.
   useEffect(() => {
@@ -59,6 +81,8 @@ export default function About() {
               alt=""
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
+              loading="lazy"
+              decoding="async"
               className={`object-cover transition-opacity duration-1000 ease-out ${
                 i === slide ? "opacity-100" : "opacity-0"
               }`}

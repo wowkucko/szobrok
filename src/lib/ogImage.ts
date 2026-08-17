@@ -4,9 +4,7 @@ import type { OverlayOptions } from "sharp";
 /** A Meta / Facebook által ajánlott OG-kép méret. */
 export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
-/** A weboldal sötét alapszíne (zinc-950) — a portré képek kerete. */
-const OG_BACKGROUND = "#09090b";
-/** Ez alatt a képarány alatt „álló" képként kezeljük: nem vágunk, hanem keretezünk. */
+/** Ez alatt a képarány alatt „álló" (portré) képként kezeljük és figyelem-alapú vágást használunk. */
 const PORTRAIT_ASPECT = 1.2;
 
 /**
@@ -15,9 +13,8 @@ const PORTRAIT_ASPECT = 1.2;
  *
  * - Táj / közel négyzetes (képarány ≥ 1.2): kitölti a teljes kártyát (cover),
  *   nincs sáv — a kép lényege a középpontban marad.
- * - Álló / portré: a sötét márkaháttéren (zinc-950) középen jelenik meg
- *   (contain) — a szobor sosem vágódik le, a kártya illeszkedik az oldal
- *   stílusához.
+ * - Álló / portré: figyelem-alapú vágás (cover + attention) — az alak feje és
+ *   vállai nagyban, felismerhetően látszódnak, nem kicsinyítve a teljes kép.
  *
  * A JPEG/PNG/WebP mellett a GIF (első képkocka) és az SVG (kirajzolva) is
  * támogatott. Hiba esetén null-t ad vissza — a feltöltés sosem bukik el emiatt.
@@ -31,19 +28,30 @@ export async function generateOgImage(
     const height = meta.height ?? OG_HEIGHT;
     const isLandscape = width / height >= PORTRAIT_ASPECT;
 
-    const pipeline = isLandscape
-      ? sharp(buffer, { failOn: "none" }).resize(OG_WIDTH, OG_HEIGHT, {
-          fit: "cover",
-          position: "centre",
-        })
-      : sharp(buffer, { failOn: "none" }).resize(OG_WIDTH, OG_HEIGHT, {
-          fit: "contain",
-          background: OG_BACKGROUND,
-        });
+    if (isLandscape) {
+      // Táj / közel négyzetes: kitölti a teljes kártyát (cover), középre
+      // fókuszálva — a kép lényege a középpontban marad.
+      return await sharp(buffer, { failOn: "none" })
+        .resize(OG_WIDTH, OG_HEIGHT, { fit: "cover", position: "centre" })
+        .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
+        .toBuffer();
+    }
 
-    return await pipeline
-      .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
-      .toBuffer();
+    // Álló / portré: figyelem-alapú vágás (cover), hogy az alak feje/vállai
+    // nagyban, felismerhetően látszódjanak — nem „contain"-ként kicsinyítve
+    // a teljes képet. Ha az attention valamilyen formátumnál nem támogatott,
+    // fentről vágunk (a fej így is benne marad).
+    try {
+      return await sharp(buffer, { failOn: "none" })
+        .resize(OG_WIDTH, OG_HEIGHT, { fit: "cover", position: "attention" })
+        .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
+        .toBuffer();
+    } catch {
+      return await sharp(buffer, { failOn: "none" })
+        .resize(OG_WIDTH, OG_HEIGHT, { fit: "cover", position: "north" })
+        .png({ compressionLevel: 9, adaptiveFiltering: true, effort: 9 })
+        .toBuffer();
+    }
   } catch {
     return null;
   }
@@ -69,6 +77,41 @@ interface CollageOptions {
 function formatPriceText(price: number, currency?: string): string {
   const formatted = new Intl.NumberFormat("hu-HU").format(price);
   return currency === "EUR" ? `${formatted} EUR` : `${formatted} Ft`;
+}
+
+/**
+ * Egy kép cellába vágása úgy, hogy a LÉNYEG mindig látszódjon.
+ *
+ * A sima középre vágás (cover + centre) álló (portré) fotóknál a képnek csak
+ * a középső sávját hagyja meg — egy magas szoborfotónál pont a fej és a
+ * talapzat vágódik le, így nem lehet felismerni, mi van a képen.
+ *
+ * Ezért figyelem-alapú (attention) vágást használunk: a sharp a legérdekesebb
+ * régiót keresi meg (éles részletek + bőrtónusok), így az alak feje/vállai
+ * benne maradnak a cellában. Ha valamilyen formátumnál az attention nem
+ * támogatott, portré képnél fentről, egyébként középről vágunk.
+ */
+async function resizeCellToFit(
+  buffer: Uint8Array,
+  width: number,
+  height: number
+): Promise<Buffer> {
+  try {
+    return await sharp(buffer, { failOn: "none" })
+      .resize(width, height, { fit: "cover", position: "attention" })
+      .png()
+      .toBuffer();
+  } catch {
+    const meta = await sharp(buffer, { failOn: "none" }).metadata();
+    const portrait = (meta.width ?? 1) < (meta.height ?? 1);
+    return await sharp(buffer, { failOn: "none" })
+      .resize(width, height, {
+        fit: "cover",
+        position: portrait ? "north" : "centre",
+      })
+      .png()
+      .toBuffer();
+  }
 }
 
 /**
@@ -156,14 +199,10 @@ export async function generateCollageOgImage(
             ? [top2(0), top2(1), { left: Math.round((OG_WIDTH - cellW) / 2), top: margin + cellH + gap }]
             : [top2(0), top2(1), bottom2(0), bottom2(1)];
 
-      // Minden kép kitölti a celláját (cover), a középpontra fókuszálva
+      // Minden kép kitölti a celláját — figyelem-alapú vágással, hogy az
+      // alak (fej/váll) mindig benne maradjon, ne csak a törzs.
       const resized = await Promise.all(
-        upTo4.map((buf) =>
-          sharp(buf, { failOn: "none" })
-            .resize(cellW, cellH, { fit: "cover", position: "centre" })
-            .png()
-            .toBuffer()
-        )
+        upTo4.map((buf) => resizeCellToFit(buf, cellW, cellH))
       );
       const base = await sharp({
         create: { width: OG_WIDTH, height: OG_HEIGHT, channels: 4, background: COLLAGE_BG },

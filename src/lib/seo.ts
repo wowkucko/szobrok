@@ -27,12 +27,14 @@ export function ogImageFor(
   if (!thumb) return absoluteUrl("/images/og-default.png");
 
   // Feltöltött kép (/api/files/…): a feltöltéskor automatikusan generált
-  // OG-PNG verzió. A név determinisztikus (og-<base>.png), így mindig létezik.
+  // OG-PNG verzió. A név determinisztikus (og-v2-<base>.png) — a v2 a
+  // figyelem-alapú vágást jelöli; a hiányzó fájlt a /api/files route menet
+  // közben előállítja.
   if (thumb.startsWith("/api/files/")) {
     const base = thumb
       .replace(/^\/api\/files\//, "")
       .replace(/\.(jpe?g|png|webp|gif|svg)$/i, "");
-    return absoluteUrl(`/api/files/og-${base}.png`);
+    return absoluteUrl(`/api/files/og-v2-${base}.png`);
   }
 
   // Az SVG bélyegképek mellé generált PNG változat (a crawler-ek nem
@@ -62,5 +64,7 @@ export function ogCollageFor(
   const base = first
     .replace(/^\/api\/files\//, "")
     .replace(/\.(jpe?g|png|webp|gif|svg)$/i, "");
-  return absoluteUrl(`/api/files/og-collage-${base}.png`);
+  // A „v2" verzió: a korábbi (középre vágott) kollázsok helyett a
+  // figyelem-alapú vágású változat készül el automatikusan a frissítés után.
+  return absoluteUrl(`/api/files/og-collage-v2-${base}.png`);
 }

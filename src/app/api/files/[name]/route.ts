@@ -1,7 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { collageFileName, generateProductCollage } from "@/lib/ogCollage";
+import {
+  collageFileName,
+  generateCardThumbForImage,
+  generateGalleryThumbForImage,
+  generateProductCollage,
+} from "@/lib/ogCollage";
+import { generateOgImage } from "@/lib/ogImage";
 import { getProducts } from "@/lib/db";
 
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
@@ -37,6 +43,46 @@ export async function GET(
         (p) => collageFileName(p.images) === safe
       );
       if (product) await generateProductCollage(product);
+    }
+    // Hiányzó EGYKÉPES OG (og-v2-<base>.png): az eredeti feltöltésből
+    // (<base>.<ext>) állítjuk elő figyelem-alapú vágással, hogy a már meglévő
+    // termékeknél is automatikusan elkészüljön a frissített változat.
+    if (safe.startsWith("og-v2-") && !existsSync(filePath)) {
+      const base = safe.replace(/^og-v2-/, "").replace(/\.png$/, "");
+      const original = readdirSync(UPLOAD_DIR).find(
+        (f) =>
+          f.startsWith(`${base}.`) &&
+          /\.(jpe?g|png|webp|gif|svg)$/i.test(f)
+      );
+      if (original) {
+        const ogData = await generateOgImage(
+          readFileSync(path.join(UPLOAD_DIR, original))
+        );
+        if (ogData) writeFileSync(filePath, ogData);
+      }
+    }
+    // Hiányzó KÁRTYA-BÉLYEGKÉP (card-<base>.jpg): 4:5 arányú, figyelem-alapú
+    // vágású JPEG a portfólió-kártyákhoz — a már meglévő képeknél is
+    // automatikusan elkészül, így a kártyán az alak feje/vállai látszódnak.
+    if (safe.startsWith("card-") && !existsSync(filePath)) {
+      const base = safe.replace(/^card-/, "").replace(/\.jpg$/, "");
+      const original = readdirSync(UPLOAD_DIR).find(
+        (f) =>
+          f.startsWith(`${base}.`) &&
+          /\.(jpe?g|png|webp|gif|svg)$/i.test(f)
+      );
+      if (original) await generateCardThumbForImage(`/api/files/${original}`);
+    }
+    // Hiányzó GALÉRIA-FŐKÉP (gallery-<base>.jpg): nagyobb (1200×1500)
+    // figyelem-alapú vágású JPEG a részletek-oldali galériához.
+    if (safe.startsWith("gallery-") && !existsSync(filePath)) {
+      const base = safe.replace(/^gallery-/, "").replace(/\.jpg$/, "");
+      const original = readdirSync(UPLOAD_DIR).find(
+        (f) =>
+          f.startsWith(`${base}.`) &&
+          /\.(jpe?g|png|webp|gif|svg)$/i.test(f)
+      );
+      if (original) await generateGalleryThumbForImage(`/api/files/${original}`);
     }
     if (!existsSync(filePath)) {
       return new NextResponse("Nincs ilyen fájl.", { status: 404 });

@@ -365,13 +365,15 @@ export default function ProductGallery({
             ref={listRef}
             className="mt-8 grid scroll-mt-24 grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
-            {visible.map((product: Product) => (
+            {visible.map((product: Product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 isBookmarked={isBookmarked(product.id)}
                 onToggleBookmark={toggleBookmark}
                 onTagClick={toggleTag}
+                // Az első kártya az LCP-elem: a képe preload-olódik
+                priority={index === 0}
               />
             ))}
           </div>

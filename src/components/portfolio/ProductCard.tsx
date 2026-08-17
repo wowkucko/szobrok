@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { Heart, Ruler, Truck } from "lucide-react";
 import type { Product } from "@/types/product";
 import { formatPrice, isNewProduct } from "@/lib/products";
+import { cardThumbUrlFor } from "@/lib/imageUrls";
 
 interface ProductCardProps {
   product: Product;
@@ -13,6 +14,8 @@ interface ProductCardProps {
   onToggleBookmark: (id: string) => void;
   /** Ha megadod, a címkék gombként viselkednek és ezt hívják (pl. szűrés). */
   onTagClick?: (tag: string) => void;
+  /** Az első (LCP) kártyán preload-olja a képet — csak az első elemre add meg. */
+  priority?: boolean;
 }
 
 export default function ProductCard({
@@ -20,6 +23,7 @@ export default function ProductCard({
   isBookmarked,
   onToggleBookmark,
   onTagClick,
+  priority = false,
 }: ProductCardProps) {
   const [pulse, setPulse] = useState(false);
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,10 +43,15 @@ export default function ProductCard({
   // Elkelt (nem elérhető) termék: tompított kártya, hogy azonnal látszódjon,
   // hogy már nem vásárolható.
   const sold = !product.isAvailable;
-  const coverImage = product.thumbnail ?? product.images[0];
-  // Hover-kép: az első kép, ami nem a bélyegkép.
-  const hoverImage = product.images.find((img) => img !== coverImage);
-  const hasSecondImage = hoverImage !== undefined;
+  const coverImage = cardThumbUrlFor(product.thumbnail ?? product.images[0]);
+  // Hover-kép: az első kép, ami nem a bélyegkép. A kártyán a 4:5 arányú,
+  // figyelem-alapú vágású változat jelenik meg (portré fotóknál is látszik
+  // az alak feje), ezért mindkét képet azon keresztül kérjük le.
+  const hoverImage = product.images.find(
+    (img) => img !== (product.thumbnail ?? product.images[0])
+  );
+  const hoverImageUrl = hoverImage ? cardThumbUrlFor(hoverImage) : undefined;
+  const hasSecondImage = hoverImageUrl !== undefined;
 
   return (
     <article
@@ -64,6 +73,8 @@ export default function ProductCard({
                 src={coverImage}
                 alt={product.title}
                 fill
+                priority={priority}
+                unoptimized
                 sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                 className={`object-cover transition-all duration-500 ${
                   sold ? "saturate-[0.3]" : ""
@@ -75,9 +86,10 @@ export default function ProductCard({
               />
               {hasSecondImage && (
                 <Image
-                  src={hoverImage}
+                  src={hoverImageUrl as string}
                   alt={`${product.title} — további fotó`}
                   fill
+                  unoptimized
                   sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                   className={`scale-105 object-cover opacity-0 transition-all duration-500 group-hover:opacity-100 ${
                     sold ? "saturate-[0.3]" : ""

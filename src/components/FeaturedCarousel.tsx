@@ -76,12 +76,12 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
         ref={trackRef}
         className="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {products.map((product) => (
+        {products.map((product, index) => (
           <div
             key={product.id}
             className="flex w-full shrink-0 snap-start sm:w-[calc(50%-0.75rem)] lg:w-[calc(25%-1.125rem)]"
           >
-            <RelatedProductCard product={product} />
+            <RelatedProductCard product={product} priority={index === 0} />
           </div>
         ))}
       </div>

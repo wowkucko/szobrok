@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { cardThumbUrlFor, galleryThumbUrlFor } from "@/lib/imageUrls";
 
 interface MediaGalleryProps {
   images: string[];
@@ -46,12 +47,16 @@ export default function MediaGallery({ images, title }: MediaGalleryProps) {
 
   return (
     <div>
-      {/* Fő kép */}
+      {/* Fő kép — a 4:5 arányú, előre méretezett (gallery-<base>.jpg) változat:
+          gyors betöltés, nincs szerver-oldali átméretezés, a hiányzó fájlt a
+          /api/files route menet közben előállítja. */}
       <div className="relative aspect-[4/5] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/40">
         <Image
-          src={activeImage}
+          src={galleryThumbUrlFor(activeImage)}
           alt={`${title} — ${active + 1}. kép`}
           fill
+          priority
+          unoptimized
           sizes="(min-width: 768px) 50vw, 100vw"
           className="object-cover"
         />
@@ -102,11 +107,14 @@ export default function MediaGallery({ images, title }: MediaGalleryProps) {
                   : "border-zinc-800 opacity-60 hover:opacity-100"
               }`}
             >
+              {/* A kis bélyegkép a 4:5 arányú, előre méretezett card-változatot
+                  használja — nem a teljes eredeti képet tölti le. */}
               <Image
-                src={img}
+                src={cardThumbUrlFor(img)}
                 alt=""
                 fill
                 sizes="96px"
+                unoptimized
                 className="object-cover"
               />
             </button>

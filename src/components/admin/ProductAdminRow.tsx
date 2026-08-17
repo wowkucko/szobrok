@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ExternalLink, GripVertical, ImageOff, Pencil, Rss, Trash2 } from "lucide-react";
 import type { Product } from "@/types/product";
 import { formatPrice } from "@/lib/products";
+import { cardThumbUrlFor } from "@/lib/imageUrls";
 import FeedEditorModal from "@/components/admin/FeedEditorModal";
 
 export default function ProductAdminRow({
@@ -188,11 +189,14 @@ export default function ProductAdminRow({
       <td className="py-3 pl-3 pr-3">
         <div className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
           {(product.thumbnail ?? product.images[0]) ? (
+            /* A kis táblázat-bélyegkép a 4:5 arányú, előre méretezett
+               card-változatot használja — nem a teljes eredeti képet. */
             <Image
-              src={product.thumbnail ?? product.images[0]}
+              src={cardThumbUrlFor(product.thumbnail ?? product.images[0])}
               alt={product.title}
               width={44}
               height={56}
+              unoptimized
               className="h-full w-full object-cover"
             />
           ) : (
