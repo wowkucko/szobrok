@@ -27,6 +27,9 @@ export default function ProductCard({
 }: ProductCardProps) {
   const [pulse, setPulse] = useState(false);
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A bélyegkép betöltésének állapota: amíg nem kész, a kártyán szép,
+  // halvány shimmer-loader látszik a kép helyén, és a kép lágyan úszik be.
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const handleBookmark = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -69,6 +72,32 @@ export default function ProductCard({
         >
           {product.images.length > 0 ? (
             <>
+              {/* Loader: amíg a lazy kép betöltődik, halvány borostyán
+                  fénycsík fut át a kártya képterületén, alatta a márka
+                  festőecset-sziluettje vízjelként. */}
+              {!imageLoaded && (
+                <div className="card-image-loader" aria-hidden="true">
+                  {/* Márka-sziluett: a favicon festőecsete, nagyon halványan,
+                      flexboxszal középre igazítva (a translate utility-k itt
+                      megbízhatatlanok, ezért a konténer centrál). */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg
+                      viewBox="0 0 64 64"
+                      className="brush-silhouette"
+                      style={{ width: "clamp(64px, 16vw, 110px)", height: "auto", opacity: 0.13 }}
+                      fill="#fbbf24"
+                      aria-hidden="true"
+                    >
+                      <g transform="rotate(-45 32 32)">
+                        <rect x="9" y="27" width="27" height="10" rx="5" />
+                        <rect x="36" y="25" width="5" height="14" rx="1.5" />
+                        <path d="M41 26 L57 19.5 Q61.5 32 57 44.5 L41 38 Q43.5 32 41 26 Z" />
+                      </g>
+                      <path d="M50 3 Q55.5 9.5 50 14.5 Q44.5 9.5 50 3 Z" />
+                    </svg>
+                  </div>
+                </div>
+              )}
               <Image
                 src={coverImage}
                 alt={product.title}
@@ -76,12 +105,15 @@ export default function ProductCard({
                 priority={priority}
                 unoptimized
                 sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
-                className={`object-cover transition-all duration-500 ${
+                onLoad={() => setImageLoaded(true)}
+                className={`object-cover transition-all duration-700 ease-out ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                } ${
                   sold ? "saturate-[0.3]" : ""
                 } ${
                   hasSecondImage
-                    ? "group-hover:scale-105 group-hover:opacity-0"
-                    : "group-hover:scale-105"
+                    ? "group-hover:scale-105 group-hover:opacity-0 group-hover:duration-500"
+                    : "group-hover:scale-105 group-hover:duration-500"
                 }`}
               />
               {hasSecondImage && (
@@ -124,7 +156,7 @@ export default function ProductCard({
               ? `${product.title} eltávolítása a kedvencekből`
               : `${product.title} mentése a kedvencek közé`
           }
-          className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-sm transition-colors ${
+          className={`absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-sm transition-colors ${
             isBookmarked
               ? "border-amber-500/60 bg-amber-500/20 text-amber-500"
               : "border-zinc-700/80 bg-zinc-950/60 text-zinc-300 hover:border-amber-600/60 hover:text-amber-500"
@@ -140,13 +172,13 @@ export default function ProductCard({
         </button>
 
         {isNew && (
-          <span className="absolute left-3 top-3 rounded-full bg-amber-600 px-2.5 py-1 text-xs font-semibold text-zinc-950">
+          <span className="absolute left-3 top-3 z-10 rounded-full bg-amber-600 px-2.5 py-1 text-xs font-semibold text-zinc-950">
             Új
           </span>
         )}
 
         {!product.isAvailable && (
-          <div className="absolute inset-x-0 bottom-0 flex justify-center pb-3">
+          <div className="absolute inset-x-0 bottom-0 z-10 flex justify-center pb-3">
             <span className="rounded-full border border-amber-500/50 bg-zinc-950/85 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-amber-400 backdrop-blur-sm">
               Elkelt
             </span>

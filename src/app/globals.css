@@ -70,3 +70,65 @@ body {
     transform: scale(1);
   }
 }
+
+/* Termékkártya kép-loader: sötét háttéren halvány borostyán fénycsík
+   (shimmer) úszik át lassan, amíg a lazy kép betöltődik.
+   @layer components alatt: a Tailwind v4 rétegezett utility-jei (pl.
+   absolute, inset-0) ne írják felül a saját szabályait. */
+@layer components {
+  @keyframes card-shimmer {
+    0% {
+      transform: translateX(-160%);
+    }
+    100% {
+      transform: translateX(260%);
+    }
+  }
+
+  .card-image-loader {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, #18181b 0%, #101012 100%);
+    /* A loader csak vizuális háttér: ne nyelje el a kattintásokat, és ne
+       fedje el a felette lévő vezérlőket (kedvencek gomb, jelvények). */
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .card-image-loader::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 28%,
+      rgb(245 158 11 / 0.06) 50%,
+      transparent 72%
+    );
+    transform: translateX(-160%);
+    animation: card-shimmer 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  /* A márka-sziluett nagyon halvány, lassú lebegése — élettelibbé teszi a
+     betöltést anélkül, hogy elvonná a figyelmet. */
+  @keyframes brush-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  .card-image-loader .brush-silhouette {
+    animation: brush-float 5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-image-loader .brush-silhouette {
+      animation: none;
+    }
+  }
+}
