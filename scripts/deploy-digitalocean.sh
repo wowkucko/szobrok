@@ -25,9 +25,11 @@ WWW_DOMAIN="www.festettszobrok.com"
 APP_DIR="/var/www/weblap"
 NODE_MAJOR="24"
 APP_PORT="3000"
-# Ha üres, a szkript feltételezi, hogy a kódot már scp-vel felvitted
-# a $APP_DIR-be. Ha megadod, git clone-nal tölti le.
-REPO_URL=""
+# A kód forrása: git clone ebből a repóból. Ha a repó privát, a szerveren
+# először állíts be hozzáférést (pl. deploy key vagy PAT a .netrc-ben),
+# különben a clone interaktív jelszókéréssel elakad. Üresen hagyva a szkript
+# azt feltételezi, hogy a kódot már scp-vel felvitted a $APP_DIR-be.
+REPO_URL="https://github.com/wowkucko/szobrok.git"
 
 # ---------- Színes kimenet ----------
 C_GREEN='\033[0;32m'; C_YELLOW='\033[1;33m'; C_CYAN='\033[0;36m'; C_RED='\033[0;31m'; C_NC='\033[0m'
@@ -185,4 +187,4 @@ echo ""
 echo "  Jótanácsok:"
 echo "   - Az Umami Cloudnál engedélyezd csak a ${DOMAIN} domaint."
 echo "   - A droplet-re is készíts havi Snapshotot a DigitalOcean panelen."
-echo "   - A frissítés a jövőben: git pull && npm run build && pm2 restart weblap"
+echo "   - A frissítés a jövőben: bash ${APP_DIR}/scripts/update.sh"
