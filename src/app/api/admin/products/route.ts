@@ -10,6 +10,7 @@ import {
   updateProductPrice,
   type ProductInput,
 } from "@/lib/db";
+import { refreshCollageForProduct } from "@/lib/ogCollage";
 import type { PrintTechnology } from "@/types/product";
 
 const TECHNOLOGIES: PrintTechnology[] = ["MSLA Resin (12K)", "FDM (0.08 mm)"];
@@ -82,6 +83,20 @@ function invalidatePublicCache(productId?: string) {
   if (productId) revalidatePath(`/portfolio/${productId}`);
 }
 
+/**
+ * A megosztási kollázs újragenerálása termék-mentés után — a kollázson az ár
+ * (és az „Elkelt" jelvény) is szerepel, ezért árváltozásnál és elérhetőség-
+ * váltásnál is frissülnie kell. Hiba esetén csendben kihagyjuk: a /api/files
+ * route a hiányzót menet közben úgyis előállítja.
+ */
+async function refreshCollage(id: string): Promise<void> {
+  try {
+    await refreshCollageForProduct(id);
+  } catch {
+    // nem blokkoljuk a mentést a kollázs miatt
+  }
+}
+
 /** Termékek listázása a szerveroldali szűrőkkel (URL paraméterek). */
 export async function GET(request: NextRequest) {
   const filters = parseProductQuery(
@@ -99,6 +114,7 @@ export async function POST(request: NextRequest) {
   if (err) return NextResponse.json({ error: err }, { status: 400 });
   const { id } = createProduct(input);
   invalidatePublicCache(id);
+  await refreshCollage(id);
   return NextResponse.json({ ok: true, id });
 }
 
@@ -109,17 +125,20 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Hiányzó termék id" }, { status: 400 });
   }
 
-  // Flag-toggle (a listaoldal kapcsolóihoz)
+  // Flag-toggle (a listaoldal kapcsolóihoz) — az elérhetőség-váltás az
+  // „Elkelt" jelvényt is érinti a kollázson, ezért ott is újragenerálunk.
   if (body.field === "featured" || body.field === "is_available") {
     const updated = updateProductFlag(body.id, body.field, Boolean(body.value));
     if (!updated) {
       return NextResponse.json({ error: "Nincs ilyen termék" }, { status: 404 });
     }
     invalidatePublicCache(body.id);
+    await refreshCollage(body.id);
     return NextResponse.json({ ok: true });
   }
 
-  // Gyors árszerkesztés (a listaoldali árra kattintva)
+  // Gyors árszerkesztés (a listaoldali árra kattintva) — az ár a kollázson
+  // is megjelenik, ezért itt is újragenerálunk.
   if (body.field === "price") {
     const price = Math.max(0, num(body.value));
     const updated = updateProductPrice(body.id, price);
@@ -127,6 +146,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Nincs ilyen termék" }, { status: 404 });
     }
     invalidatePublicCache(body.id);
+    await refreshCollage(body.id);
     return NextResponse.json({ ok: true, price });
   }
 
@@ -139,6 +159,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Nincs ilyen termék" }, { status: 404 });
   }
   invalidatePublicCache(body.id);
+  await refreshCollage(body.id);
   return NextResponse.json({ ok: true });
 }
 

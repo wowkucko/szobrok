@@ -34,7 +34,7 @@ import {
   getRelatedProducts,
 } from "@/lib/db";
 import { formatPrice } from "@/lib/products";
-import { SITE_NAME, SITE_URL, ogImageFor } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, ogCollageFor, ogImageFor } from "@/lib/seo";
 
 // Az admin felületen végzett módosítások legfeljebb 60 másodpercen belül
 // megjelennek a részletező oldalakon is (ISR).
@@ -49,6 +49,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const product = getProductById(id);
   if (!product) return { title: "Nem található" };
   const title = `${product.title} — Festett Szobrok`;
+  // Megosztási előnézet: a kollázs (első 4 fotó + ár), ha van feltöltött kép,
+  // különben az egyképes OG-kép. A kollázs CSAK a megosztásban látszik.
+  const shareImage = ogCollageFor(product) ?? ogImageFor(product);
   return {
     title: { absolute: title },
     description: product.shortDescription,
@@ -58,13 +61,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `/portfolio/${product.id}`,
       title,
       description: product.shortDescription,
-      images: [{ url: ogImageFor(product) }],
+      images: [{ url: shareImage }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description: product.shortDescription,
-      images: [ogImageFor(product)],
+      images: [shareImage],
     },
   };
 }

@@ -31,14 +31,48 @@ export default function ShareButtons() {
     copyTimer.current = setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleFacebook = () => {
+  const handleFacebook = async () => {
     const url = getCurrentUrl();
     if (!url) return;
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      "_blank",
-      "noopener,noreferrer,width=640,height=480"
-    );
+    // Mobil (érintőképernyős) eszközön a natív megosztási lap a legjobb út:
+    // abban a Facebook app is benne van, egy érintéssel a feedre lehet osztani.
+    const touchPrimary =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+    if (touchPrimary && navigator.share) {
+      try {
+        await navigator.share({ url, title: document.title });
+        return;
+      } catch {
+        // a felhasználó megszakította, vagy nem sikerült — jön a fallback
+      }
+    }
+    openFacebookSharer(url);
+  };
+
+  /**
+   * A Facebook megosztót VALÓDI linkként, új lapon nyitja meg — nem
+   * window.open-popupként, amit a böngészők popup-blokkolója eldobhat
+   * (ezért „nem történt semmi" a gombra kattintva).
+   *
+   * A www.facebook.com/sharer/sharer.php-t a Facebook 2024 óta DESKTOPON
+   * üres share_channel-oldalra irányítja (ismert, széles körben jelentett
+   * hiba — a link nem jelenik meg a megosztóban). Az m.facebook.com-os
+   * (mobil) verzió viszont a működő párbeszédablakot adja, amelyben a
+   * megosztott URL előre csatolt linkként jelenik meg — ezt használjuk
+   * desktopon is, így a termék linkje mindig bekerül a megosztásba.
+   */
+  const openFacebookSharer = (url: string) => {
+    const shareUrl = `https://m.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+      url
+    )}`;
+    const anchor = document.createElement("a");
+    anchor.href = shareUrl;
+    anchor.target = "_blank";
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
   };
 
   return (

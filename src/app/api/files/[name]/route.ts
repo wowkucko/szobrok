@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { collageFileName, generateProductCollage } from "@/lib/ogCollage";
+import { getProducts } from "@/lib/db";
 
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
@@ -26,7 +28,19 @@ export async function GET(
   const filePath = path.join(UPLOAD_DIR, safe);
 
   if (!existsSync(filePath)) {
-    return new NextResponse("Nincs ilyen fájl.", { status: 404 });
+    // Hiányzó kollázs (pl. a meta már rámutat, de a fájl még nincs kész):
+    // megkeressük a terméket az első kép alapján és menet közben előállítjuk.
+    // Így a már feltöltött termékeknél is automatikusan elkészül, akár a
+    // közösségi crawler első kérésére is — utána a lemezre kerülve gyors.
+    if (safe.startsWith("og-collage-")) {
+      const product = getProducts().find(
+        (p) => collageFileName(p.images) === safe
+      );
+      if (product) await generateProductCollage(product);
+    }
+    if (!existsSync(filePath)) {
+      return new NextResponse("Nincs ilyen fájl.", { status: 404 });
+    }
   }
 
   const ext = path.extname(safe).toLowerCase();

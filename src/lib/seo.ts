@@ -46,3 +46,21 @@ export function ogImageFor(
   }
   return absoluteUrl(thumb);
 }
+
+/**
+ * A termék Kollázs-OG-képének URL-je (a közösségi megosztás előnézete):
+ * az első 4 fotó 2×2-es összeállítása a jobb alsó sarokban az árral.
+ * Csak feltöltött képeknél létezik (determinisztikus név az első képből);
+ * a hiányzó kollázst a /api/files route menet közben előállítja. Ha nincs
+ * feltöltött kép, null — ilyenkor a sima egyképes ogImageFor a tartalék.
+ */
+export function ogCollageFor(
+  product: Pick<Product, "images">
+): string | null {
+  const first = product.images[0];
+  if (!first || !first.startsWith("/api/files/")) return null;
+  const base = first
+    .replace(/^\/api\/files\//, "")
+    .replace(/\.(jpe?g|png|webp|gif|svg)$/i, "");
+  return absoluteUrl(`/api/files/og-collage-${base}.png`);
+}
