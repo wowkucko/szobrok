@@ -11,19 +11,19 @@ interface ProductVideoProps {
   title: string;
 }
 
-/** YouTube link → beágyazható embed URL (vagy null, ha nem YouTube). */
-function getYouTubeEmbedUrl(url: string): string | null {
+/** YouTube link → videó ID (vagy null, ha nem YouTube). */
+function getYouTubeId(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname === "youtu.be") {
       const id = u.pathname.slice(1).split("/")[0];
-      return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+      return id || null;
     }
     if (/(^|\.)youtube\.com$/.test(u.hostname)) {
       const v = u.searchParams.get("v");
-      if (v) return `https://www.youtube-nocookie.com/embed/${v}`;
+      if (v) return v;
       const p = u.pathname.match(/\/embed\/([\w-]+)/);
-      if (p) return `https://www.youtube-nocookie.com/embed/${p[1]}`;
+      if (p) return p[1];
     }
   } catch {
     // nem URL → nem YouTube
@@ -48,7 +48,8 @@ export default function ProductVideo({
 }: ProductVideoProps) {
   const [started, setStarted] = useState(false);
 
-  const youtube = getYouTubeEmbedUrl(videoUrl);
+  const youtubeId = getYouTubeId(videoUrl);
+  const youtube = youtubeId ? `https://www.youtube-nocookie.com/embed/${youtubeId}` : null;
   const isFile = isVideoFile(videoUrl);
 
   // Nem beágyazható link — külső megnyitás
@@ -70,13 +71,24 @@ export default function ProductVideo({
   if (started) {
     if (youtube) {
       // - vq=highres: a legmagasabb elérhető minőséget kéri a lejátszó
+      // - mute=1: a videó mindig némítva indul (a látogató kattintására
+      //   induló autoplayt a böngésző egyébként hanggal engedné)
+      // - loop=1 + playlist=<id>: a körbeforgatás végtelen hurokban ismétlődik
+      //   (a YouTube csak így, a playlist paraméterrel hajlandó loopolni)
       // - controls=0: a YouTube összes gombja elrejtve — magára a videóra
       //   kattintva vált a lejátszó lejátszás/szünet között (natív viselkedés)
       // - modestbranding/rel=0/iv_load_policy=3/fs=0: nincs branding,
       //   ajánlott videó, felirat-ikon vagy teljes képernyő gomb
+      // - sandbox (allow-scripts + allow-same-origin + allow-presentation):
+      //   a YouTube belső linkjei („Megnyitás a YouTube-on") és popupok
+      //   blokkolva — a videó kizárólag beágyazva nézhető, nem nyitható meg
+      //   a YouTube-on (allow-top-navigation / allow-popups nélkül)
       const params = new URLSearchParams({
         autoplay: "1",
         vq: "highres",
+        mute: "1",
+        loop: "1",
+        playlist: youtubeId!,
         controls: "0",
         modestbranding: "1",
         rel: "0",
@@ -89,7 +101,7 @@ export default function ProductVideo({
           src={`${youtube}?${params.toString()}`}
           title={`${title} — 360°-os videó`}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
+          sandbox="allow-scripts allow-same-origin allow-presentation"
           className="aspect-video w-full rounded-xl border border-zinc-800 bg-black"
         />
       );
@@ -98,6 +110,7 @@ export default function ProductVideo({
       <video
         controls
         autoPlay
+        loop
         className="aspect-video w-full rounded-xl border border-zinc-800 bg-black"
       >
         <source src={videoUrl} />
