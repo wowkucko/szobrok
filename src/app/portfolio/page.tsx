@@ -3,12 +3,8 @@ import { Package } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGallery from "@/components/portfolio/ProductGallery";
-import {
-  getAvailableCount,
-  getProducts,
-  getScaleOptions,
-  getTagOptions,
-} from "@/lib/db";
+import { getAvailableCount, getProducts, getTagOptions } from "@/lib/db";
+import { buildScaleOptions, buildSizeRanges } from "@/lib/products";
 import { parsePortfolioFilters } from "@/lib/portfolioFilters";
 
 interface PageProps {
@@ -70,13 +66,20 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   // visszahozható. Az oldal ebből kapja a kezdő szűrőállapotot.
   const initialFilters = parsePortfolioFilters(await searchParams);
 
-  const [products, availableCount, tagOptions, scaleOptions] =
-    await Promise.all([
-      getProducts(),
-      getAvailableCount(),
-      getTagOptions(),
-      getScaleOptions(),
-    ]);
+  const [products, availableCount, tagOptions] = await Promise.all([
+    getProducts(),
+    getAvailableCount(),
+    getTagOptions(),
+  ]);
+
+  // A méret-szűrők a termékek tényleges magasságából számolódnak,
+  // hogy minden szobor (a legnagyobb is) mindig valamelyik sávba essen.
+  const sizeOptions = buildSizeRanges(
+    products.map((p) => p.dimensions.heightCm)
+  );
+  // A méretarány-szűrők ugyanígy a termékek tényleges értékeiből jönnek
+  // (a méretarány nélküli darabok „Egyedi méret" opciót kapnak).
+  const scaleOptions = buildScaleOptions(products);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
@@ -110,6 +113,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
             products={products}
             tagOptions={tagOptions}
             scaleOptions={scaleOptions}
+            sizeOptions={sizeOptions}
             initialFilters={initialFilters}
           />
         </section>

@@ -8,7 +8,12 @@ import ProductFilters from "./ProductFilters";
 import type { SizeFilterOption } from "./ProductFilters";
 import { useBookmarks } from "@/lib/useBookmarks";
 import type { Product } from "@/types/product";
-import { SIZE_RANGES, normalizeText, type SortOption } from "@/lib/products";
+import {
+  normalizeText,
+  SCALE_NONE,
+  type ScaleOption,
+  type SortOption,
+} from "@/lib/products";
 import {
   DEFAULT_PORTFOLIO_FILTERS,
   serializePortfolioFilters,
@@ -18,16 +23,13 @@ import {
 interface ProductGalleryProps {
   products: Product[];
   tagOptions: string[];
-  scaleOptions: string[];
+  /** A méretarány-opciók a termékek tényleges értékeiből (dinamikusak). */
+  scaleOptions: ScaleOption[];
+  /** A méret-tartományok a termékek tényleges magasságából számolva. */
+  sizeOptions: SizeFilterOption[];
   /** Az URL-ből (searchParams) értelmezett szűrőállapot — a szűrők az URL-ben élnek. */
   initialFilters: PortfolioFilters;
 }
-
-const SIZE_OPTIONS: SizeFilterOption[] = SIZE_RANGES.map((r) => ({
-  value: r.value,
-  label: r.label,
-  hint: r.hint,
-}));
 
 /** Hány termék jelenik meg egy portfólió-oldalon. */
 const PAGE_SIZE = 12;
@@ -54,6 +56,7 @@ export default function ProductGallery({
   products,
   tagOptions,
   scaleOptions,
+  sizeOptions,
   initialFilters,
 }: ProductGalleryProps) {
   const router = useRouter();
@@ -163,12 +166,24 @@ export default function ProductGallery({
 
   const changeAvailable = (v: boolean) => writeFilters({ availableOnly: v });
 
-  /** Lapozás — megtartja a szűrőket, csak a page paramétert írja, és a lista
-   *  tetejére görget. */
+  /** Lapozás — megtartja a szűrőket, csak a page paramétert írja. A görgetés
+   *  külön effectben történik (lásd lentebb), mert a kattintáskor indított
+   *  azonnali scrollIntoView a RSC-navigáció közben megszakad — főleg
+   *  mobilon, ahol hosszú utat kell görgetni. */
   const changePage = (p: number) => {
     writeUrl({ ...currentFilters(), page: p });
-    listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  // Ha az oldalszám változott (lapozás), az új oldal tartalmának commitja
+  // UTÁN görgetünk a lista tetejére — így a görgetés nem ütközik az
+  // újrarendereléssel, és mobilon is megbízhatóan a kártyákhoz ér.
+  const prevPageRef = useRef(initialFilters.page);
+  useEffect(() => {
+    if (prevPageRef.current !== initialFilters.page) {
+      prevPageRef.current = initialFilters.page;
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [initialFilters.page]);
 
   const resetFilters = () => {
     setDrafts({ query: "", min: "", max: "" });
@@ -225,22 +240,30 @@ export default function ProductGallery({
       if (min !== null && p.price < min) return false;
       if (max !== null && p.price > max) return false;
 
-      // Méret kategória
+      // Méret kategória — a sávok dinamikusak (a termékekből számoltak),
+      // a felső határ nyitott: height >= min és height < max, így minden
+      // szobor (a legnagyobb is) pontosan egy sávba esik.
       if (selectedSizes.length > 0) {
         const sizeOk = selectedSizes.some((value) => {
-          const range = SIZE_RANGES.find((r) => r.value === value);
+          const range = sizeOptions.find((r) => r.value === value);
           if (!range) return false;
-          return p.dimensions.heightCm >= range.min && p.dimensions.heightCm <= range.max;
+          return (
+            p.dimensions.heightCm >= range.min &&
+            p.dimensions.heightCm < range.max
+          );
         });
         if (!sizeOk) return false;
       }
 
-      // Méretarány
-      if (
-        selectedScales.length > 0 &&
-        (!p.dimensions.scale || !selectedScales.includes(p.dimensions.scale))
-      ) {
-        return false;
+      // Méretarány — a tényleges értékekre illeszkedik; a méretarány nélküli
+      // termékek az „Egyedi méret" (SCALE_NONE) opcióra, így azok sem esnek
+      // ki az összes szűrőből, ha nincs kiválasztva az az opció.
+      if (selectedScales.length > 0) {
+        const scale = p.dimensions.scale?.trim() || null;
+        const matches = scale
+          ? selectedScales.includes(scale)
+          : selectedScales.includes(SCALE_NONE);
+        if (!matches) return false;
       }
 
       // Csak kedvencek
@@ -285,6 +308,7 @@ export default function ProductGallery({
     selectedTags,
     selectedSizes,
     selectedScales,
+    sizeOptions,
     sort,
     availableOnly,
     favoritesOnly,
@@ -346,7 +370,7 @@ export default function ProductGallery({
             setDrafts((d) => ({ ...d, min, max }));
             scheduleFilterWrite({ priceMin: min, priceMax: max });
           }}
-          sizeOptions={SIZE_OPTIONS}
+          sizeOptions={sizeOptions}
           selectedSizes={selectedSizes}
           onToggleSize={(v) => toggleInList(v, selectedSizes, "selectedSizes")}
           scaleOptions={scaleOptions}

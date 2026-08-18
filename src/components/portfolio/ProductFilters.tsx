@@ -1,14 +1,11 @@
 "use client";
 
 import { ChevronDown, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
-import type { SortOption } from "@/lib/products";
+import type { ScaleOption, SizeRange, SortOption } from "@/lib/products";
 import { SORT_OPTIONS } from "@/lib/products";
 
-export interface SizeFilterOption {
-  value: string;
-  label: string;
-  hint: string;
-}
+/** A méret-szűrő opciója — a tartományok dinamikusan a termékekből jönnek. */
+export type SizeFilterOption = SizeRange;
 
 interface ProductFiltersProps {
   tagOptions: string[];
@@ -27,7 +24,8 @@ interface ProductFiltersProps {
   sizeOptions: SizeFilterOption[];
   selectedSizes: string[];
   onToggleSize: (value: string) => void;
-  scaleOptions: string[];
+  /** A méretarány-opciók a termékek tényleges értékeiből (dinamikusak). */
+  scaleOptions: ScaleOption[];
   selectedScales: string[];
   onToggleScale: (value: string) => void;
   activeCount: number;
@@ -238,13 +236,13 @@ export default function ProductFilters({
             Méretarány
           </legend>
           <div className="flex flex-wrap gap-2">
-            {scaleOptions.map((scale) => {
-              const active = selectedScales.includes(scale);
+            {scaleOptions.map((opt) => {
+              const active = selectedScales.includes(opt.value);
               return (
                 <button
-                  key={scale}
+                  key={opt.value}
                   type="button"
-                  onClick={() => onToggleScale(scale)}
+                  onClick={() => onToggleScale(opt.value)}
                   aria-pressed={active}
                   className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                     active
@@ -252,7 +250,11 @@ export default function ProductFilters({
                       : "border-zinc-800 text-zinc-400 hover:border-zinc-600"
                   }`}
                 >
-                  {scale}
+                  {opt.label}
+                  <span className="mx-1.5 opacity-40" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="opacity-60">{opt.count}</span>
                 </button>
               );
             })}
