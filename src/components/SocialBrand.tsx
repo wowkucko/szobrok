@@ -2,25 +2,6 @@
 // Minden komponens (csempe, lábjegyzet, kapcsolat) ezt a modult használja,
 // így a platformok és a linkek mindenhol egységesek.
 
-export function InstagramIcon({ className = "h-6 w-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="ig-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#F09433" />
-          <stop offset="0.25" stopColor="#E6683C" />
-          <stop offset="0.5" stopColor="#DC2743" />
-          <stop offset="0.75" stopColor="#CC2366" />
-          <stop offset="1" stopColor="#BC1888" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="20" height="20" rx="5.5" fill="none" stroke="url(#ig-grad)" strokeWidth="2.2" />
-      <circle cx="12" cy="12" r="4.4" fill="none" stroke="url(#ig-grad)" strokeWidth="2.2" />
-      <circle cx="17.3" cy="6.7" r="1.4" fill="url(#ig-grad)" />
-    </svg>
-  );
-}
-
 export function FacebookIcon({ className = "h-6 w-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
@@ -44,10 +25,9 @@ export function TikTokIcon({ className = "h-6 w-6" }: { className?: string }) {
   );
 }
 
-// Mindenhol ugyanaz a három platform, ugyanazokkal a (placeholder) linkekkel.
-// A valódi profil URL-eket itt, egy helyen cserélheted le.
+// Mindenhol ugyanaz a két platform, ugyanazokkal a valódi linkekkel.
+// A profil URL-eket itt, egy helyen cserélheted le.
 export const SOCIAL_LINKS = [
-  { name: "Instagram", href: "https://www.instagram.com/", Icon: InstagramIcon },
-  { name: "Facebook", href: "https://www.facebook.com/", Icon: FacebookIcon },
-  { name: "TikTok", href: "https://www.tiktok.com/", Icon: TikTokIcon },
+  { name: "Facebook", href: "https://www.facebook.com/profile.php?id=61593401732985", Icon: FacebookIcon },
+  { name: "TikTok", href: "https://www.tiktok.com/@szobrokfestett", Icon: TikTokIcon },
 ];
