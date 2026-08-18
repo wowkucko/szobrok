@@ -18,6 +18,10 @@ const REFERENCE_CM = 23.5;
 const formatCm = (value: number) => String(value).replace(".", ",");
 // A PET palack SVG képaránya a levágott (tight) viewBox alapján (640 × 2176)
 const BOTTLE_RATIO = 640 / 2176;
+// A palack szélesség-tényezője: a valódi arány mellett a palack túl vékony
+// lenne mobilon (alig 11 px), ezért kissé „tömöttebb" megjelenést kap — a
+// MAGASSÁGA változatlan marad, így a 23,5 cm-es méretarány pontos marad.
+const BOTTLE_WIDTH_SCALE = 1.6;
 
 export default function ScaleComparison({
   heightCm,
@@ -79,12 +83,14 @@ export default function ScaleComparison({
           {heightCm} cm
         </text>
 
-        {/* Referencia: 0,5 l-es PET palack (a mellékelt SVG sziluettje) */}
+        {/* Referencia: 0,5 l-es PET palack (a mellékelt SVG sziluettje —
+            az oldal borostyán színében, a fájl neve verziózva, hogy a
+            böngésző cache ne tartsa meg a régi fekete verziót) */}
         <image
-          href="/images/comparison-bottle.svg"
-          x={227.5 - (refH * BOTTLE_RATIO) / 2}
+          href="/images/comparison-bottle-amber.svg"
+          x={227.5 - (refH * BOTTLE_RATIO * BOTTLE_WIDTH_SCALE) / 2}
           y={124 - refH}
-          width={refH * BOTTLE_RATIO}
+          width={refH * BOTTLE_RATIO * BOTTLE_WIDTH_SCALE}
           height={refH}
           preserveAspectRatio="xMidYMid meet"
           className="scale-bottle-img"

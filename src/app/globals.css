@@ -55,7 +55,9 @@ body {
 /* Méret-összehasonlítás: a fekete PET palack sziluett invertálva,
    világos vonalként látszik a sötét kártyán */
 .scale-bottle-img {
-  filter: invert(1) opacity(0.92);
+  /* A palack SVG már az oldal borostyán színében van (fill=#f59e0b) —
+     csak enyhe átlátszóság, hogy finoman illeszkedjen a sötét kártyába. */
+  opacity: 0.95;
 }
 
 /* Kedvencek gomb mikroanimációja */
