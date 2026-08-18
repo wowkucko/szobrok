@@ -69,9 +69,24 @@ export default function ProductVideo({
   // Lejátszás közben: YouTube beágyazás vagy fájl-lejátszó
   if (started) {
     if (youtube) {
+      // - vq=highres: a legmagasabb elérhető minőséget kéri a lejátszó
+      // - controls=0: a YouTube összes gombja elrejtve — magára a videóra
+      //   kattintva vált a lejátszó lejátszás/szünet között (natív viselkedés)
+      // - modestbranding/rel=0/iv_load_policy=3/fs=0: nincs branding,
+      //   ajánlott videó, felirat-ikon vagy teljes képernyő gomb
+      const params = new URLSearchParams({
+        autoplay: "1",
+        vq: "highres",
+        controls: "0",
+        modestbranding: "1",
+        rel: "0",
+        iv_load_policy: "3",
+        playsinline: "1",
+        fs: "0",
+      });
       return (
         <iframe
-          src={`${youtube}?autoplay=1&rel=0`}
+          src={`${youtube}?${params.toString()}`}
           title={`${title} — 360°-os videó`}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
