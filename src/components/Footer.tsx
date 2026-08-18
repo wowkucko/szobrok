@@ -1,11 +1,23 @@
 import Link from "next/link";
 import AnchorLink from "./AnchorLink";
+import NewsletterForm from "./NewsletterForm";
 import { NAV_LINKS, SITE_NAME } from "@/lib/data";
 import { SOCIAL_LINKS } from "./SocialBrand";
 
-export default function Footer() {
+interface FooterProps {
+  /** A hírlevél-sáv megjelenjen-e a footerben. A főoldal saját hírlevél-
+   *  szekciót kapott, ott kikapcsoljuk, hogy ne legyen kétszer. */
+  showNewsletter?: boolean;
+}
+
+export default function Footer({ showNewsletter = true }: FooterProps) {
   return (
     <footer className="border-t border-zinc-800/60">
+      {showNewsletter && (
+        <div className="mx-auto max-w-6xl px-6 pt-12">
+          <NewsletterForm />
+        </div>
+      )}
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-8 px-6 py-12 text-center md:flex-row md:items-start md:text-left">
         <div>
           <p className="text-sm font-semibold">{SITE_NAME}</p>
@@ -34,6 +46,12 @@ export default function Footer() {
             className="transition-colors hover:text-amber-500"
           >
             ÁSZF
+          </Link>
+          <Link
+            href="/adatvedelem"
+            className="transition-colors hover:text-amber-500"
+          >
+            Adatvédelmi tájékoztató
           </Link>
         </nav>
         <div className="flex gap-3">
