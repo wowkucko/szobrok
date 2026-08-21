@@ -149,7 +149,7 @@ export default async function AdminLoginPage({
               párost.
             </p>
             <a
-              href="/admin"
+              href="/admin?auth=basic"
               className="mt-3 inline-flex text-xs text-amber-500 hover:text-amber-400"
             >
               Próbálkozás Basic Auth-tal →

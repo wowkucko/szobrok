@@ -58,6 +58,10 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
+  // Explicit Basic Auth kérés (?auth=basic): akkor is 401 + Basic challenge,
+  // ha Google be van állítva — így a böngésző felugró ablaka működik oldalaknál is.
+  const forceBasic = req.nextUrl.searchParams.get("auth") === "basic";
+
   // Egyik hitelesítés sem sikerült
   const hasAnyConfig = hasGoogleConfig() || hasBasicConfig();
   if (!hasAnyConfig) {
@@ -68,7 +72,7 @@ export default auth((req) => {
   }
 
   // API esetén 401 + Basic challenge (hogy a fallback böngésző prompt is működjön)
-  if (pathname.startsWith("/api/")) {
+  if (pathname.startsWith("/api/") || forceBasic) {
     return new NextResponse("Belépés szükséges.", {
       status: 401,
       headers: {
