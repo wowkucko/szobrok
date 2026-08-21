@@ -21,6 +21,7 @@ import {
 import { brokenFeedImages } from "@/lib/feedImages";
 import AdminProductTable from "@/components/admin/AdminProductTable";
 import AdminMessages from "@/components/admin/AdminMessages";
+import { auth, signOut } from "@/auth";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -51,6 +52,7 @@ export default async function AdminPage({
 
   const { products, total, filtered, page, pageCount } = queryProducts(filters);
   const unreadMessages = getUnreadMessageCount();
+  const session = await auth();
 
   // A feedben szereplő termékek képeinek ellenőrzése (a feedben megjelenő
   // URL-ek létező fájlra mutatnak-e).
@@ -81,13 +83,39 @@ export default async function AdminPage({
               <Database className="h-7 w-7 text-amber-500" />
               Termék adatbázis
             </h1>
-            <Link
-              href="/admin/products/new"
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-amber-600 px-5 text-sm font-medium text-zinc-950 transition-colors hover:bg-amber-500"
-            >
-              <Plus className="h-4 w-4" />
-              Új termék
-            </Link>
+            <div className="flex items-center gap-3">
+              {session?.user?.email ? (
+                <div className="flex items-center gap-3">
+                  <span className="hidden sm:inline text-xs text-zinc-400">
+                    {session.user.email}
+                  </span>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await signOut({ redirectTo: "/admin/login" });
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="inline-flex h-9 items-center rounded-full border border-zinc-700 bg-zinc-900 px-4 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                    >
+                      Kijelentkezés
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <span className="inline-flex h-9 items-center rounded-full border border-zinc-700 bg-zinc-900/60 px-4 text-xs text-zinc-500">
+                  Basic Auth
+                </span>
+              )}
+              <Link
+                href="/admin/products/new"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-amber-600 px-5 text-sm font-medium text-zinc-950 transition-colors hover:bg-amber-500"
+              >
+                <Plus className="h-4 w-4" />
+                Új termék
+              </Link>
+            </div>
           </div>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
             {total} termék a SQLite adatbázisban (data/artisanprints.db).
