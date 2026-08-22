@@ -15,6 +15,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/akcio" },
 };
 
+// A kedvezmény mértéke az adminban kezelt kuponoktól függ, ezért minden
+// kérésnél frissen olvassuk a DB-t (ne fagyasszuk be a build idejére).
+export const dynamic = "force-dynamic";
+
 export default function AkcioPage() {
   const maxDiscount = getMaxActiveCouponDiscount();
   return (

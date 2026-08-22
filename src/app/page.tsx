@@ -10,9 +10,10 @@ import ContactForm from "@/components/ContactForm";
 import DiscountCta from "@/components/DiscountCta";
 import Footer from "@/components/Footer";
 
-// A főoldal periodikusan újragenerálódik, így a kiemelt (featured) termékek
-// változása az admin oldalról legfeljebb 60 másodpercen belül megjelenik.
-export const revalidate = 60;
+// A főoldal minden kérésnél frissen renderelődik, mert a kedvezményes
+// (DiscountCta) blokk értéke az adminban kezelt kuponoktól függ, és azonnal
+// tükröznie kell a változást (ne fagyjon be a build idejére).
+export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
