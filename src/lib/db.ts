@@ -171,6 +171,29 @@ const MESSAGES_SCHEMA = `
     attachment_type TEXT NOT NULL DEFAULT '',
     attachment_path TEXT NOT NULL DEFAULT '',
     is_read INTEGER NOT NULL DEFAULT 0,
+    coupon TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  )
+`;
+
+const REFERRALS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS referrals (
+    code TEXT PRIMARY KEY,
+    clicks INTEGER NOT NULL DEFAULT 0,
+    unlocked INTEGER NOT NULL DEFAULT 0,
+    coupon TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    unlocked_at TEXT
+  )
+`;
+
+const COUPONS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS coupons (
+    code TEXT PRIMARY KEY,
+    label TEXT NOT NULL DEFAULT '',
+    discount INTEGER NOT NULL DEFAULT 10,
+    active INTEGER NOT NULL DEFAULT 1,
+    uses INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   )
 `;
@@ -298,6 +321,21 @@ function getDb(): DatabaseSync {
   db.exec(SCHEMA);
   db.exec(FEED_SCHEMA);
   db.exec(MESSAGES_SCHEMA);
+  db.exec(REFERRALS_SCHEMA);
+  db.exec(COUPONS_SCHEMA);
+  // Régebbi coupons tábla kiterjesztése a discount oszloppal (ha még nincs)
+  try {
+    const cols = db
+      .prepare("PRAGMA table_info(coupons)")
+      .all() as { name: string }[];
+    if (!cols.some((c) => c.name === "discount")) {
+      db.exec(
+        "ALTER TABLE coupons ADD COLUMN discount INTEGER NOT NULL DEFAULT 10"
+      );
+    }
+  } catch {
+    // nem kritikus
+  }
   // A korábbi verzió custom_fields oszlopát eltávolítjuk, ha még megvan
   // (a termékből származó mezőket már olvasáskor feloldjuk, nincs rá szükség).
   try {
@@ -340,6 +378,12 @@ function getDb(): DatabaseSync {
     .prepare("SELECT COUNT(*) AS count FROM products")
     .get() as unknown as { count: number };
   if (count === 0) seedFromJson(db);
+  // Régebbi adatbázisoknál a messages.coupon oszlop hiányozhat
+  try {
+    db.exec("ALTER TABLE messages ADD COLUMN coupon TEXT NOT NULL DEFAULT ''");
+  } catch {
+    // már létezik — minden rendben
+  }
   return db;
 }
 
@@ -1115,6 +1159,8 @@ export interface Message {
   /** A melléklet URL-je (a letöltéshez), vagy üres ha nincs. */
   attachmentUrl: string;
   isRead: boolean;
+  /** Opcionális kupon kód, amit a látogató az űrlapnál megadott. */
+  coupon: string;
   createdAt: string;
 }
 
@@ -1132,6 +1178,7 @@ interface MessageRow {
   attachment_type: string;
   attachment_path: string;
   is_read: number;
+  coupon: string;
   created_at: string;
 }
 
@@ -1153,6 +1200,7 @@ function rowToMessage(r: MessageRow): Message {
         ? `/api/files/${encodeURIComponent(r.attachment_path)}`
         : "",
     isRead: r.is_read === 1,
+    coupon: r.coupon ?? "",
     createdAt: r.created_at,
   };
 }
@@ -1160,8 +1208,8 @@ function rowToMessage(r: MessageRow): Message {
 const INSERT_MESSAGE_SQL = `
   INSERT INTO messages (
     id, type, product_id, product_title, name, email, phone, offer,
-    message, attachment_name, attachment_type, attachment_path, is_read, created_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    message, attachment_name, attachment_type, attachment_path, is_read, coupon, created_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
 `;
 
 export interface MessageInput {
@@ -1177,6 +1225,8 @@ export interface MessageInput {
   attachmentType?: string;
   /** A mentett melléklet fájlneve (a data/uploads alatt), vagy üres. */
   attachmentPath?: string;
+  /** Opcionális kupon kód az űrlapról. */
+  coupon?: string;
 }
 
 /** Új üzenet mentése az adatbázisba. Visszaadja az id-t. */
@@ -1198,6 +1248,7 @@ export function createMessage(input: MessageInput): string {
       input.attachmentName ?? "",
       input.attachmentType ?? "",
       input.attachmentPath ?? "",
+      input.coupon ?? "",
       new Date().toISOString()
     );
 
@@ -1215,6 +1266,15 @@ export function createMessage(input: MessageInput): string {
       })
     )
     .catch(() => {});
+
+  // Kupon használat számlálója (ha a megadott kód létezik a rendszerben)
+  if (input.coupon) {
+    try {
+      incrementCouponUses(input.coupon);
+    } catch {
+      // nem kritikus
+    }
+  }
 
   return id;
 }
@@ -1255,4 +1315,264 @@ export function getUnreadMessageCount(): number {
     .prepare("SELECT COUNT(*) AS count FROM messages WHERE is_read = 0")
     .get() as unknown as { count: number };
   return count;
+}
+
+// ---------------------------------------------------------------------------
+// Referral akció (kedvezményes kupon megosztásért — fiók nélkül)
+// ---------------------------------------------------------------------------
+
+/** Hány kattintás kell a kupon feloldásához. */
+export const REFERRAL_MIN_CLICKS = Math.max(
+  1,
+  Number(process.env.REFERRAL_MIN_CLICKS ?? "5") || 5
+);
+/** A feloldáskor adott kupon kód (az űrlapnál használható). */
+export const REFERRAL_COUPON =
+  (process.env.REFERRAL_COUPON_CODE ?? "").trim() || "OSZDMEG10";
+
+export interface ReferralStatus {
+  code: string;
+  clicks: number;
+  unlocked: boolean;
+  coupon: string;
+}
+
+interface ReferralRow {
+  code: string;
+  clicks: number;
+  unlocked: number;
+  coupon: string;
+  created_at: string;
+  unlocked_at: string | null;
+}
+
+/** Olvasható, önellenőrző jellegű (de nem kritikus) random kód. */
+function randomReferralCode(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 8; i++) {
+    s += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return s;
+}
+
+/** Új referral kód létrehozása (egyedi). Visszaadja a kódot. */
+export function createReferral(): { code: string } {
+  const target = getDb();
+  let code = randomReferralCode();
+  while (
+    target.prepare("SELECT 1 FROM referrals WHERE code = ?").get(code) !==
+    undefined
+  ) {
+    code = randomReferralCode();
+  }
+  target
+    .prepare(
+      "INSERT INTO referrals (code, clicks, unlocked, coupon, created_at) VALUES (?, 0, 0, ?, ?)"
+    )
+    .run(code, REFERRAL_COUPON, new Date().toISOString());
+  return { code };
+}
+
+/** Referral állapot lekérése (kattintás nélkül). */
+export function getReferral(code: string): ReferralStatus | null {
+  const row = getDb()
+    .prepare("SELECT * FROM referrals WHERE code = ?")
+    .get(code) as ReferralRow | undefined;
+  if (!row) return null;
+  return {
+    code: row.code,
+    clicks: row.clicks,
+    unlocked: row.unlocked === 1,
+    coupon: row.coupon,
+  };
+}
+
+/**
+ * Egy kattintás rögzítése a referral linken. A feloldás akkor történik,
+ * ha a kattintások elérik a minimumot. Ugyanazt a böngészőt (sütialapú
+ * deduplikáció) nem számoljuk többször — ezt a hívó oldalon (API) kezeljük.
+ * Feloldáskor egy VÉLETLEN, aktív kupont rendel a referralhoz (ha van
+ * ilyen); egyébként az env-ben megadott fallback kódot használja.
+ */
+export function incrementReferralClick(code: string): ReferralStatus | null {
+  const target = getDb();
+  const row = target
+    .prepare("SELECT * FROM referrals WHERE code = ?")
+    .get(code) as ReferralRow | undefined;
+  if (!row) return null;
+
+  const newClicks = row.clicks + 1;
+  const wasUnlocked = row.unlocked === 1;
+  const nowUnlocked = wasUnlocked || newClicks >= REFERRAL_MIN_CLICKS;
+
+  let coupon = row.coupon;
+  if (nowUnlocked && !wasUnlocked) {
+    // Feloldáskor: véletlen aktív kupon, vagy env fallback
+    const active = getActiveCoupons();
+    coupon =
+      active.length > 0
+        ? active[Math.floor(Math.random() * active.length)].code
+        : REFERRAL_COUPON;
+  }
+
+  target
+    .prepare(
+      "UPDATE referrals SET clicks = ?, unlocked = ?, coupon = ?, unlocked_at = COALESCE(unlocked_at, ?) WHERE code = ?"
+    )
+    .run(
+      newClicks,
+      nowUnlocked ? 1 : 0,
+      coupon,
+      nowUnlocked ? new Date().toISOString() : null,
+      code
+    );
+
+  return { code, clicks: newClicks, unlocked: nowUnlocked, coupon };
+}
+
+// ---------------------------------------------------------------------------
+// Kuponok (admin által kezelhető, több kód, aktiválható/inaktiválható)
+// ---------------------------------------------------------------------------
+
+export interface Coupon {
+  code: string;
+  label: string;
+  discount: number;
+  active: boolean;
+  uses: number;
+  createdAt: string;
+}
+
+interface CouponRow {
+  code: string;
+  label: string;
+  discount: number;
+  active: number;
+  uses: number;
+  created_at: string;
+}
+
+function normalizeCouponCode(value: string): string {
+  return value.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+/** Összes kupon (admin listához). */
+export function listCoupons(): Coupon[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM coupons ORDER BY active DESC, created_at DESC")
+    .all() as unknown as CouponRow[];
+  return rows.map((r) => ({
+    code: r.code,
+    label: r.label,
+    discount: r.discount,
+    active: r.active === 1,
+    uses: r.uses,
+    createdAt: r.created_at,
+  }));
+}
+
+/** Aktív kuponok (a referral feloldáshoz és az érvényesítéshez). */
+export function getActiveCoupons(): Coupon[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM coupons WHERE active = 1")
+    .all() as unknown as CouponRow[];
+  return rows.map((r) => ({
+    code: r.code,
+    label: r.label,
+    discount: r.discount,
+    active: true,
+    uses: r.uses,
+    createdAt: r.created_at,
+  }));
+}
+
+/**
+ * Az elérhető (aktív) kuponok közül a legmagasabb kedvezmény %.
+ * Ha nincs aktív kupon, az alapértelmezett 10%-ot adja vissza.
+ */
+export function getMaxActiveCouponDiscount(): number {
+  const rows = getDb()
+    .prepare("SELECT MAX(discount) AS maxDiscount FROM coupons WHERE active = 1")
+    .get() as { maxDiscount: number | null };
+  const max = rows.maxDiscount;
+  return typeof max === "number" && max > 0 ? max : 10;
+}
+
+/** Kupon lekérése kód alapján (érvényesítéshez). */
+export function getCoupon(code: string): Coupon | null {
+  const normalized = normalizeCouponCode(code);
+  const row = getDb()
+    .prepare("SELECT * FROM coupons WHERE code = ?")
+    .get(normalized) as CouponRow | undefined;
+  if (!row) return null;
+  return {
+    code: row.code,
+    label: row.label,
+    discount: row.discount,
+    active: row.active === 1,
+    uses: row.uses,
+    createdAt: row.created_at,
+  };
+}
+
+/** Új kupon létrehozása. Hiba (duplikált kód) esetén null. */
+export function createCoupon(
+  code: string,
+  label = "",
+  discount = 10
+): { ok: true; coupon: Coupon } | { ok: false; error: string } {
+  const normalized = normalizeCouponCode(code);
+  if (!normalized) return { ok: false, error: "A kód nem lehet üres." };
+  const safeDiscount = Number.isFinite(discount)
+    ? Math.max(0, Math.min(100, Math.round(discount)))
+    : 10;
+  const existing = getDb()
+    .prepare("SELECT 1 FROM coupons WHERE code = ?")
+    .get(normalized);
+  if (existing) return { ok: false, error: "Ez a kód már létezik." };
+  getDb()
+    .prepare(
+      "INSERT INTO coupons (code, label, discount, active, uses, created_at) VALUES (?, ?, ?, 1, 0, ?)"
+    )
+    .run(normalized, label.trim(), safeDiscount, new Date().toISOString());
+  return {
+    ok: true,
+    coupon: {
+      code: normalized,
+      label: label.trim(),
+      discount: safeDiscount,
+      active: true,
+      uses: 0,
+      createdAt: new Date().toISOString(),
+    },
+  };
+}
+
+/** Aktív/inaktív állapot beállítása. */
+export function setCouponActive(
+  code: string,
+  active: boolean
+): boolean {
+  const normalized = normalizeCouponCode(code);
+  const res = getDb()
+    .prepare("UPDATE coupons SET active = ? WHERE code = ?")
+    .run(active ? 1 : 0, normalized);
+  return (res as { changes: number }).changes > 0;
+}
+
+/** Kupon törlése. */
+export function deleteCoupon(code: string): boolean {
+  const normalized = normalizeCouponCode(code);
+  const res = getDb().prepare("DELETE FROM coupons WHERE code = ?").run(normalized);
+  return (res as { changes: number }).changes > 0;
+}
+
+/** Felhasználás számláló növelése (ha létezik a kód). */
+export function incrementCouponUses(code: string): void {
+  const normalized = normalizeCouponCode(code);
+  if (!normalized) return;
+  getDb()
+    .prepare("UPDATE coupons SET uses = uses + 1 WHERE code = ?")
+    .run(normalized);
 }

@@ -60,11 +60,13 @@ export default function NavLinks({
   return (
     <>
       {NAV_LINKS.map((link) => {
-        const isActive = activeHref === link.href;
+        const isRoute = link.href.startsWith("/");
+        const href = isRoute ? link.href : isHome ? link.href : `/${link.href}`;
+        const isActive = !isRoute && activeHref === link.href;
         return (
           <Link
             key={link.href}
-            href={isHome ? link.href : `/${link.href}`}
+            href={href}
             onClick={onNavigate}
             aria-current={isActive ? "true" : undefined}
             className={`text-sm transition-colors ${

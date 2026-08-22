@@ -8,6 +8,7 @@ import {
   SITE_URL,
   absoluteUrl,
 } from "@/lib/seo";
+import ReferralTracker from "@/components/ReferralTracker";
 
 // Google Search Console verifikáció. Ha a NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
 // env változó be van állítva (a Google „Meta tag" módszeréhez adott token),
@@ -116,6 +117,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         {children}
+        <ReferralTracker />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}

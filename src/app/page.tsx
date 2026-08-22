@@ -7,6 +7,7 @@ import CommissionProcess from "@/components/CommissionProcess";
 import About from "@/components/About";
 import NewsletterForm from "@/components/NewsletterForm";
 import ContactForm from "@/components/ContactForm";
+import DiscountCta from "@/components/DiscountCta";
 import Footer from "@/components/Footer";
 
 // A főoldal periodikusan újragenerálódik, így a kiemelt (featured) termékek
@@ -48,6 +49,7 @@ export default function Home() {
           </div>
         </section>
         <ContactForm />
+        <DiscountCta />
       </main>
       <Footer showNewsletter={false} />
     </div>

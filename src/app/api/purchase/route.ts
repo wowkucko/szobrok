@@ -6,6 +6,7 @@ interface PurchasePayload {
   productTitle: string;
   name: string;
   email: string;
+  coupon?: string;
 }
 
 function validate(payload: unknown): PurchasePayload | null {
@@ -25,6 +26,8 @@ function validate(payload: unknown): PurchasePayload | null {
     productTitle: typeof p.productTitle === "string" ? p.productTitle : "",
     name: p.name.trim(),
     email: p.email.trim(),
+    coupon:
+      typeof p.coupon === "string" ? p.coupon.trim().toUpperCase() : "",
   };
 }
 
@@ -53,6 +56,7 @@ export async function POST(request: Request) {
     productTitle: purchase.productTitle,
     name: purchase.name,
     email: purchase.email,
+    coupon: purchase.coupon,
     message: "",
   });
 

@@ -23,11 +23,12 @@ interface PurchaseModalProps {
 interface FormState {
   name: string;
   email: string;
+  coupon: string;
 }
 
 type Errors = Partial<Record<keyof FormState | "terms", string>>;
 
-const INITIAL: FormState = { name: "", email: "" };
+const INITIAL: FormState = { name: "", email: "", coupon: "" };
 
 function validate(form: FormState): Errors {
   const errors: Errors = {};
@@ -102,6 +103,7 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
           productTitle: product.title,
           name: form.name,
           email: form.email,
+          coupon: form.coupon,
         }),
       });
       if (!res.ok) throw new Error("Hiba történt");
@@ -276,6 +278,29 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
                           {errors.email}
                         </p>
                       )}
+                    </div>
+
+                    {/* Kuponkód — opcionális, az akciós oldalon szerzett kedvezmény */}
+                    <div>
+                      <label
+                        htmlFor="purchase-coupon"
+                        className="mb-1.5 block text-sm font-medium text-zinc-300"
+                      >
+                        Kuponkód{" "}
+                        <span className="text-zinc-500">(opcionális)</span>
+                      </label>
+                      <input
+                        id="purchase-coupon"
+                        type="text"
+                        value={form.coupon}
+                        onChange={(e) => set("coupon", e.target.value)}
+                        autoComplete="off"
+                        className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 text-sm uppercase text-zinc-100 placeholder:text-zinc-600 focus:border-amber-600/60 focus:outline-none"
+                      />
+                      <p className="mt-1.5 text-xs text-zinc-500">
+                        Az akciós oldalon szerzett kedvezményes kódot itt adhatod
+                        meg — a megrendelésnél érvényesítjük.
+                      </p>
                     </div>
 
                     {/* ÁSZF elfogadás — csak bejelölés után aktív a küldés */}

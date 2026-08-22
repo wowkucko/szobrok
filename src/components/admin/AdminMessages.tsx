@@ -301,6 +301,14 @@ export default function AdminMessages() {
                             </dd>
                           </div>
                         )}
+                        {m.coupon && (
+                          <div>
+                            <dt className="text-xs text-zinc-500">Kuponkód</dt>
+                            <dd className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-amber-600/30 bg-amber-600/10 px-2.5 py-0.5 font-mono text-xs font-semibold text-amber-400">
+                              {m.coupon}
+                            </dd>
+                          </div>
+                        )}
                         {m.attachmentUrl && (
                           <div>
                             <dt className="text-xs text-zinc-500">Melléklet</dt>

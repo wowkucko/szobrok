@@ -7,6 +7,10 @@ const STORAGE_KEY = "artisanprints-bookmarks";
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
+// Stabil referencia a szerver-oldali snapshotnak — különben React
+// "getServerSnapshot should be cached" végtelen ciklust jelez.
+const SERVER_SNAPSHOT: string[] = [];
+
 let cached: string[] | null = null;
 
 function read(): string[] {
@@ -53,7 +57,11 @@ function update(mutator: (prev: string[]) => string[]) {
  * hydration eltérés, a kliens oldalon viszont azonnal frissül.
  */
 export function useBookmarks() {
-  const bookmarks = useSyncExternalStore(subscribe, getSnapshot, () => []);
+  const bookmarks = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    () => SERVER_SNAPSHOT
+  );
 
   const toggleBookmark = useCallback((id: string) => {
     update((prev) =>

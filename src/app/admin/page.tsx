@@ -7,6 +7,7 @@ import {
   Inbox,
   Plus,
   Rss,
+  Ticket,
 } from "lucide-react";
 import {
   getCategoryOptions,
@@ -155,33 +156,44 @@ export default async function AdminPage({
       {/* Fülváltó: Termékek / Üzenetek */}
       <div className="border-b border-zinc-800 bg-zinc-950">
         <div className="mx-auto flex max-w-6xl gap-1 px-6">
-          <Link
-            href="/admin"
-            className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
-              tab === "products"
-                ? "border-amber-500 text-amber-500"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            <Database className="h-4 w-4" />
-            Termékek
-          </Link>
-          <Link
-            href="/admin?tab=messages"
-            className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
-              tab === "messages"
-                ? "border-amber-500 text-amber-500"
-                : "border-transparent text-zinc-500 hover:text-zinc-300"
-            }`}
-          >
-            <Inbox className="h-4 w-4" />
-            Üzenetek
-            {unreadMessages > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs font-semibold text-zinc-950">
-                {unreadMessages}
-              </span>
-            )}
-          </Link>
+            <Link
+              href="/admin"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                tab === "products"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Database className="h-4 w-4" />
+              Termékek
+            </Link>
+            <Link
+              href="/admin?tab=messages"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                tab === "messages"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Inbox className="h-4 w-4" />
+              Üzenetek
+              {unreadMessages > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 text-xs font-semibold text-zinc-950">
+                  {unreadMessages}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/admin/coupons"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                false
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Ticket className="h-4 w-4" />
+              Kuponok
+            </Link>
         </div>
       </div>
 
