@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   FlaskConical,
+  Gift,
   Lock,
   Mail,
   MapPin,
@@ -300,6 +301,22 @@ export default async function ProductDetailPage({ params }: Props) {
                     <Lock className="h-3.5 w-3.5" />
                     Biztonságos vásárlás a Meska piactéren keresztül
                   </p>
+                  {/* Kedvezményre hívó információ — csak elérhető terméknél,
+                      a közvetlen érdeklődés gombja alatt. */}
+                  <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-600/25 bg-amber-600/5 p-4">
+                    <Gift className="mt-0.5 h-4.5 w-4.5 shrink-0 text-amber-500" />
+                    <p className="text-xs leading-5 text-zinc-400">
+                      Szeretnéd olcsóbban? Jelentős kedvezményt is szerezhetsz
+                      a vásárlásra —{" "}
+                      <Link
+                        href="/akcio"
+                        className="font-medium text-amber-500 hover:text-amber-400"
+                      >
+                        részletek az akció oldalon
+                      </Link>
+                      .
+                    </p>
+                  </div>
                 </>
               ) : (
                 <>
