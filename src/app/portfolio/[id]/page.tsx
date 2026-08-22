@@ -310,6 +310,8 @@ export default async function ProductDetailPage({ params }: Props) {
                       a vásárlásra —{" "}
                       <Link
                         href="/akcio"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="font-medium text-amber-500 hover:text-amber-400"
                       >
                         részletek az akció oldalon
