@@ -139,10 +139,10 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Vásárlás"
-            className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 pb-4 shadow-2xl"
+            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-900 pb-4 shadow-2xl"
           >
             {/* Fejléc */}
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-800 px-6 py-4">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-zinc-800 bg-zinc-900 px-6 py-4">
               <div className="min-w-0">
                 <h2 className="text-base font-semibold text-zinc-100">
                   Vásárlás
@@ -162,7 +162,7 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
             </div>
 
             {/* Tartalom */}
-            <div className="overflow-y-auto px-6 py-5">
+            <div className="px-6 py-5">
               {status === "success" ? (
                 <div className="flex flex-col items-center py-8 text-center">
                   <CircleCheck className="h-12 w-12 text-amber-500" />
