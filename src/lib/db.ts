@@ -1200,6 +1200,22 @@ export function createMessage(input: MessageInput): string {
       input.attachmentPath ?? "",
       new Date().toISOString()
     );
+
+  // Telegram értesítés (SMTP nélkül) — nem blokkolja a mentést, hiba esetén csendben kihagyjuk.
+  void import("@/lib/notify")
+    .then(({ sendTelegramNotification }) =>
+      sendTelegramNotification({
+        type: input.type,
+        productTitle: input.productTitle,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        offer: input.offer,
+        message: input.message,
+      })
+    )
+    .catch(() => {});
+
   return id;
 }
 
