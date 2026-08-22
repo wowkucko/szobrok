@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createMessage } from "@/lib/db";
+import { createMessage, getCoupon } from "@/lib/db";
 
 interface PurchasePayload {
   productId: string;
@@ -48,6 +48,23 @@ export async function POST(request: Request) {
       { error: "Hiányzó vagy érvénytelen mezők." },
       { status: 400 }
     );
+  }
+
+  // Kupon ellenőrzése: csak létező és aktív kódot fogadunk el.
+  if (purchase.coupon) {
+    const coupon = getCoupon(purchase.coupon);
+    if (!coupon) {
+      return NextResponse.json(
+        { error: "A megadott kuponkód nem létezik." },
+        { status: 400 }
+      );
+    }
+    if (!coupon.active) {
+      return NextResponse.json(
+        { error: "Ez a kuponkód már nem aktív." },
+        { status: 400 }
+      );
+    }
   }
 
   createMessage({

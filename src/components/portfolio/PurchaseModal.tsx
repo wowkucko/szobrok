@@ -47,6 +47,7 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
   const [errors, setErrors] = useState<Errors>({});
   const [status, setStatus] = useState<"idle" | "sending" | "success">("idle");
   const [accepted, setAccepted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -55,6 +56,7 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
     setErrors({});
     setStatus("idle");
     setAccepted(false);
+    setSubmitError(null);
     setOpen(true);
   };
 
@@ -94,6 +96,7 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
     if (Object.keys(nextErrors).length > 0) return;
 
     setStatus("sending");
+    setSubmitError(null);
     try {
       const res = await fetch("/api/purchase", {
         method: "POST",
@@ -106,10 +109,20 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
           coupon: form.coupon,
         }),
       });
-      if (!res.ok) throw new Error("Hiba történt");
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        setSubmitError(
+          (json && typeof json.error === "string"
+            ? json.error
+            : "Hiba történt a küldés során.") as string
+        );
+        setStatus("idle");
+        return;
+      }
       setStatus("success");
     } catch {
-      setStatus("success");
+      setSubmitError("Váratlan hiba történt a küldés során.");
+      setStatus("idle");
     }
   };
 
@@ -352,6 +365,11 @@ export default function PurchaseModal({ product }: PurchaseModalProps) {
                     {!accepted && (
                       <p className="text-xs text-zinc-600">
                         A küldéshez előbb fogadd el a jogi nyilatkozatot.
+                      </p>
+                    )}
+                    {submitError && (
+                      <p className="rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-400">
+                        {submitError}
                       </p>
                     )}
                     <p className="flex items-center gap-1.5 text-xs text-zinc-500">
