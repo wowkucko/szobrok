@@ -23,6 +23,8 @@ import {
 import { brokenFeedImages } from "@/lib/feedImages";
 import AdminProductTable from "@/components/admin/AdminProductTable";
 import AdminMessages from "@/components/admin/AdminMessages";
+import AdminCoupons from "@/components/admin/AdminCoupons";
+import AdminCurrentProject from "@/components/admin/AdminCurrentProject";
 import { auth, signOut } from "@/auth";
 
 export const metadata: Metadata = {
@@ -39,7 +41,13 @@ export default async function AdminPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const tab = params.tab === "messages" ? "messages" : "products";
+  const tabRaw = params.tab;
+  const tab =
+    tabRaw === "messages" ||
+    tabRaw === "coupons" ||
+    tabRaw === "current"
+      ? tabRaw
+      : "products";
 
   // A szűrés/rendezés a URL-ből jön — megosztható, visszaállítható link
   const filters: ProductQuery = parseProductQuery(params);
@@ -154,7 +162,7 @@ export default async function AdminPage({
         </div>
       </header>
 
-      {/* Fülváltó: Termékek / Üzenetek */}
+      {/* Fülváltó: Termékek / Üzenetek / Kuponok / Jelenlegi projekt */}
       <div className="border-b border-zinc-800 bg-zinc-950">
         <div className="mx-auto flex max-w-6xl gap-1 px-6">
             <Link
@@ -185,9 +193,9 @@ export default async function AdminPage({
               )}
             </Link>
             <Link
-              href="/admin/coupons"
+              href="/admin?tab=coupons"
               className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
-                false
+                tab === "coupons"
                   ? "border-amber-500 text-amber-500"
                   : "border-transparent text-zinc-500 hover:text-zinc-300"
               }`}
@@ -196,9 +204,9 @@ export default async function AdminPage({
               Kuponok
             </Link>
             <Link
-              href="/admin/current"
+              href="/admin?tab=current"
               className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
-                false
+                tab === "current"
                   ? "border-amber-500 text-amber-500"
                   : "border-transparent text-zinc-500 hover:text-zinc-300"
               }`}
@@ -222,6 +230,28 @@ export default async function AdminPage({
               tartalmazzák.
             </p>
             <AdminMessages />
+          </>
+        ) : tab === "coupons" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">Kuponok</h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              Több kupont is létrehozhatsz, és tetszés szerint kapcsolgathatod
+              őket. Az akciós oldalon a feloldáskor a rendszer véletlenszerűen
+              ad egy <span className="text-amber-500">aktív</span> kupont a
+              látogatónak.
+            </p>
+            <AdminCoupons />
+          </>
+        ) : tab === "current" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">
+              Jelenlegi projekt
+            </h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              Egyszerre csak egy projekt jelenik meg a főoldalon, a „Kiemelt
+              alkotások" blokk alatt. A mentés felülírja a korábbit.
+            </p>
+            <AdminCurrentProject />
           </>
         ) : (
           <>
