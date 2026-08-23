@@ -34,11 +34,14 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
   // iOS Safari: snap-konténer betöltéskor néha pár px-sel balra elcsúszva
   // jelenik meg, így a kártya jobb széle (kép jobb oldala, kedvenc gomb)
   // lecsúszik a képernyőről — csak kézi görgetésre áll helyre. A mount után
-  // kényszerített 0 pozíció "kiülésre" készteti a snapet, így elsőre is
-  // teljes szélességben látszik a kártya.
+  // kétszeri requestAnimationFrame-fel kényszerített 0 pozíció "kiülésre"
+  // készteti a snapet, így elsőre is teljes szélességben látszik a kártya.
   useEffect(() => {
     const el = trackRef.current;
-    if (el) el.scrollLeft = 0;
+    if (!el) return;
+    const settle = () => el.scrollTo({ left: 0, behavior: "auto" });
+    settle();
+    requestAnimationFrame(() => requestAnimationFrame(settle));
   }, []);
 
   const scrollByPage = useCallback((dir: 1 | -1) => {
@@ -98,13 +101,12 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
 
       {canScroll && (
         <>
-          {/* Balra léptető — mobilon elrejtve (ott swipe-ot használunk, ne
-              takarja a kártya jobb/bal szélét) */}
+          {/* Balra léptető */}
           <button
             type="button"
             onClick={() => scrollByPage(-1)}
             aria-label="Előző kiemelt alkotások"
-            className="absolute left-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500 sm:flex"
+            className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -113,7 +115,7 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
             type="button"
             onClick={() => scrollByPage(1)}
             aria-label="Következő kiemelt alkotások"
-            className="absolute right-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500 sm:flex"
+            className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
