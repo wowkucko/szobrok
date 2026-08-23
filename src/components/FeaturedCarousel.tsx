@@ -31,6 +31,16 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
     return () => window.removeEventListener("resize", measure);
   }, [products.length]);
 
+  // iOS Safari: snap-konténer betöltéskor néha pár px-sel balra elcsúszva
+  // jelenik meg, így a kártya jobb széle (kép jobb oldala, kedvenc gomb)
+  // lecsúszik a képernyőről — csak kézi görgetésre áll helyre. A mount után
+  // kényszerített 0 pozíció "kiülésre" készteti a snapet, így elsőre is
+  // teljes szélességben látszik a kártya.
+  useEffect(() => {
+    const el = trackRef.current;
+    if (el) el.scrollLeft = 0;
+  }, []);
+
   const scrollByPage = useCallback((dir: 1 | -1) => {
     const el = trackRef.current;
     if (!el) return;
