@@ -79,7 +79,7 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
         {products.map((product, index) => (
           <div
             key={product.id}
-            className="flex w-full shrink-0 snap-start sm:w-[calc(50%-0.75rem)] lg:w-[calc(25%-1.125rem)]"
+            className="flex w-full max-w-full shrink-0 snap-start basis-full sm:basis-[calc(50%-0.75rem)] lg:basis-[calc(25%-1.125rem)]"
           >
             <RelatedProductCard product={product} priority={index === 0} />
           </div>
@@ -88,12 +88,13 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
 
       {canScroll && (
         <>
-          {/* Balra léptető */}
+          {/* Balra léptető — mobilon elrejtve (ott swipe-ot használunk, ne
+              takarja a kártya jobb/bal szélét) */}
           <button
             type="button"
             onClick={() => scrollByPage(-1)}
             aria-label="Előző kiemelt alkotások"
-            className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500"
+            className="absolute left-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500 sm:flex"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -102,7 +103,7 @@ export default function FeaturedCarousel({ products }: FeaturedCarouselProps) {
             type="button"
             onClick={() => scrollByPage(1)}
             aria-label="Következő kiemelt alkotások"
-            className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500"
+            className="absolute right-2 top-1/2 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-700/80 bg-zinc-950/70 text-zinc-200 shadow-lg backdrop-blur transition-colors hover:border-amber-600 hover:text-amber-500 sm:flex"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
