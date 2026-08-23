@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Database,
+  Hammer,
   ImageOff,
   Inbox,
   Plus,
@@ -193,6 +194,17 @@ export default async function AdminPage({
             >
               <Ticket className="h-4 w-4" />
               Kuponok
+            </Link>
+            <Link
+              href="/admin/current"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                false
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Hammer className="h-4 w-4" />
+              Jelenlegi projekt
             </Link>
         </div>
       </div>

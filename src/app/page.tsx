@@ -3,6 +3,7 @@ import ScrollToHash from "@/components/ScrollToHash";
 import Hero from "@/components/Hero";
 import TrustTiles from "@/components/TrustTiles";
 import FeaturedWorks from "@/components/FeaturedWorks";
+import CurrentProject from "@/components/CurrentProject";
 import CommissionProcess from "@/components/CommissionProcess";
 import About from "@/components/About";
 import NewsletterForm from "@/components/NewsletterForm";
@@ -24,6 +25,7 @@ export default function Home() {
         <Hero />
         <TrustTiles />
         <FeaturedWorks />
+        <CurrentProject />
         <CommissionProcess />
         <About />
         {/* Hírlevél — a Rólam blokk után, a Kapcsolat előtt: aki már

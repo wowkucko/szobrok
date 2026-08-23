@@ -198,6 +198,19 @@ const COUPONS_SCHEMA = `
   )
 `;
 
+// Egyszerre csak egy "jelenlegi projekt" létezhet — az id fixen 1,
+// az upsert mindig ugyanazt a sort írja felül.
+const CURRENT_PROJECT_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS current_project (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    image TEXT NOT NULL DEFAULT '',
+    progress INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  )
+`;
+
 const UPSERT_FEED_SQL = `
   INSERT INTO feed_entries (
     product_id, feed_id, title, description, availability, condition, price,
@@ -323,6 +336,7 @@ function getDb(): DatabaseSync {
   db.exec(MESSAGES_SCHEMA);
   db.exec(REFERRALS_SCHEMA);
   db.exec(COUPONS_SCHEMA);
+  db.exec(CURRENT_PROJECT_SCHEMA);
   // Régebbi coupons tábla kiterjesztése a discount oszloppal (ha még nincs)
   try {
     const cols = db
@@ -1575,4 +1589,79 @@ export function incrementCouponUses(code: string): void {
   getDb()
     .prepare("UPDATE coupons SET uses = uses + 1 WHERE code = ?")
     .run(normalized);
+}
+
+export interface CurrentProject {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  progress: number;
+  updatedAt: string;
+}
+
+function clampProgress(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/** A jelenleg megjelenítendő (egyetlen) projekt, vagy null ha nincs beállítva. */
+export function getCurrentProject(): CurrentProject | null {
+  const row = getDb()
+    .prepare(
+      "SELECT id, title, description, image, progress, updated_at FROM current_project WHERE id = 1"
+    )
+    .get() as
+    | {
+        id: number;
+        title: string;
+        description: string;
+        image: string;
+        progress: number;
+        updated_at: string;
+      }
+    | undefined;
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    image: row.image,
+    progress: row.progress,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Létrehoz vagy felülírja a jelenlegi projektet (mindig az id=1 sort). */
+export function upsertCurrentProject(input: {
+  title: string;
+  description?: string;
+  image?: string;
+  progress?: number;
+}): CurrentProject {
+  const title = input.title.trim();
+  const description = input.description?.trim() ?? "";
+  const image = input.image ?? "";
+  const progress = clampProgress(input.progress ?? 0);
+  const updatedAt = new Date().toISOString();
+  getDb()
+    .prepare(
+      `INSERT INTO current_project (id, title, description, image, progress, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         title = excluded.title,
+         description = excluded.description,
+         image = excluded.image,
+         progress = excluded.progress,
+         updated_at = excluded.updated_at`
+    )
+    .run(1, title, description, image, progress, updatedAt);
+  return getCurrentProject()!;
+}
+
+/** Eltávolítja a jelenlegi projektet (a blokk ekkor nem jelenik meg). */
+export function deleteCurrentProject(): boolean {
+  if (!getCurrentProject()) return false;
+  getDb().prepare("DELETE FROM current_project WHERE id = 1").run();
+  return true;
 }
