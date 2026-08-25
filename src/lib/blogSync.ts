@@ -22,6 +22,7 @@ import {
 import { getCultsUserCreations } from "@/lib/cults";
 import { translateBlogPosts, type TranslatedPost } from "@/lib/gemini";
 import { optimizeImage } from "@/lib/optimizeImage";
+import { logBlog } from "@/lib/blogLog";
 
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 const CONTENT_TYPE_EXT: Record<string, string> = {
@@ -38,6 +39,37 @@ export function cancelSync(username: string): void {
 }
 
 type Creation = NonNullable<Awaited<ReturnType<typeof getCultsUserCreations>>[number]>;
+
+/** Gemini hibából kinyerhető emberi olvasmányú leírás (kvóta/retryDelay). */
+function describeGeminiError(e: unknown): string {
+  const msg = String(e);
+  const m = msg.match(/Gemini válasz (\d+):\s*([\s\S]+)$/);
+  if (m) {
+    try {
+      const body = JSON.parse(m[2]) as {
+        error?: {
+          status?: string;
+          message?: string;
+          details?: Array<Record<string, unknown>>;
+        };
+      };
+      const er = body.error ?? {};
+      const details = Array.isArray(er.details) ? er.details : [];
+      const quota =
+        details.find((d) => d.quotaValue !== undefined)?.quotaValue ??
+        (er.message ? (er.message.match(/limit:\s*(\d+)/i)?.[1] ?? undefined) : undefined);
+      const retry = details.find((d) => d.retryDelay !== undefined)?.retryDelay;
+      let extra = "";
+      if (quota !== undefined || retry !== undefined) {
+        extra = ` (kvóta: ${quota ?? "?"}${retry ? `, várakozás: ${retry}` : ""})`;
+      }
+      return `${er.status ?? m[1]} – ${er.message ?? msg}${extra}`;
+    } catch {
+      return msg;
+    }
+  }
+  return msg;
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -74,6 +106,7 @@ async function translateBatchWithRetry(
   geminiKey: string | undefined
 ): Promise<{ items: { translated: TranslatedPost; ok: boolean }[] }> {
   if (!geminiKey || inputs.length === 0) {
+    if (!geminiKey) logBlog("warn", "Kötegelő fordítás kihagyva: hiányzik a GEMINI_API_KEY.");
     return {
       items: inputs.map((i) => ({
         translated: { title: i.title, excerpt: "", description: i.description },
@@ -90,13 +123,15 @@ async function translateBatchWithRetry(
       lastErr = e;
       const msg = String(e);
       if (attempt < 3 && /429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg)) {
-        await sleep(1000 * Math.pow(2, attempt));
+        const delay = 1000 * Math.pow(2, attempt);
+        logBlog("warn", `Gemini hiba (${attempt + 1}/4), újrapróbálás ${delay} ms múlva: ${describeGeminiError(e)}`);
+        await sleep(delay);
         continue;
       }
       break;
     }
   }
-  console.error(`[blogSync] kötegelt fordítás sikertelen:`, lastErr);
+  logBlog("error", `Kötegelő fordítás végleg sikertelen: ${describeGeminiError(lastErr)}`);
   return {
     items: inputs.map((i) => ({
       translated: { title: i.title, excerpt: "", description: i.description },
@@ -138,6 +173,7 @@ export async function syncSource(
   const batchDelay = opts.batchDelayMs && opts.batchDelayMs > 0 ? opts.batchDelayMs : 500;
 
   if (!apiUser || !apiKey) {
+    logBlog("error", `${username}: hiányzik a CULTS3D_USERNAME vagy CULTS3D_API_KEY környezeti változó.`);
     updateBlogSourceSync(username, {
       status: "error",
       error: "Hiányzik a CULTS3D_USERNAME vagy CULTS3D_API_KEY környezeti változó.",
@@ -156,6 +192,7 @@ export async function syncSource(
       maxPages: 1000,
     });
     updateBlogSourceSync(username, { total: creations.length });
+    logBlog("info", `${username}: ${creations.length} modell lekérve a Cults3D-ről, fordítás indul${geminiKey ? "" : " (figyelem: GEMINI_API_KEY hiányzik – angolul maradnak)"}…`);
 
     const keywords = listBlogKeywords().map((k) => k.keyword);
     const limit = opts.maxNew && opts.maxNew > 0 ? opts.maxNew : creations.length;
@@ -175,9 +212,11 @@ export async function syncSource(
         keywords,
       }));
       const { items } = await translateBatchWithRetry(inputs, geminiKey);
+      let justNow = 0;
       for (let i = 0; i < buffer.length; i++) {
         if (cancelled.has(username)) {
           cancelled.delete(username);
+          logBlog("warn", `${username}: szinkron leállítva (Leállítás gomb).`);
           updateBlogSourceSync(username, { status: "cancelled", error: null });
           touchBlogSource(username);
           buffer.length = 0;
@@ -198,6 +237,7 @@ export async function syncSource(
           publishedAt: b.publishedAt,
           translated: t.ok,
         });
+        if (t.ok) justNow++;
         imported++;
         updateBlogSourceSync(username, { progress: base + imported });
         if (imported >= limit) {
@@ -208,6 +248,7 @@ export async function syncSource(
         }
         await sleep(batchDelay);
       }
+      logBlog("info", `${username}: köteg mentve — +${justNow} lefordítva, ${buffer.length} feldolgozva (össz.: ${base + imported}).`);
       buffer.length = 0;
       return false;
     };
@@ -215,6 +256,7 @@ export async function syncSource(
     for (const c of creations) {
       if (cancelled.has(username)) {
         cancelled.delete(username);
+        logBlog("warn", `${username}: szinkron leállítva (Leállítás gomb).`);
         updateBlogSourceSync(username, { status: "cancelled", error: null });
         touchBlogSource(username);
         return { username, imported, skipped, remaining: -1 };
@@ -240,8 +282,10 @@ export async function syncSource(
 
     updateBlogSourceSync(username, { status: "done", progress: base + imported });
     touchBlogSource(username);
+    logBlog("success", `${username}: szinkron kész — ${imported} új bejegyzés, ${skipped} már meglévő kihagyva.`);
     return { username, imported, skipped, remaining: 0 };
   } catch (err) {
+    logBlog("error", `${username}: szinkron hiba: ${String(err)}`);
     updateBlogSourceSync(username, { status: "error", error: String(err) });
     throw err;
   }
@@ -274,6 +318,21 @@ export async function translateUntranslated(
   let translated = 0;
   let failed = 0;
 
+  const total = posts.length;
+  const batches = Math.ceil(total / BATCH_SIZE);
+  if (total === 0) {
+    logBlog("info", "Újrafordítás: nincs lefordítatlan bejegyzés.");
+    return { total: 0, translated: 0, failed: 0 };
+  }
+  if (!geminiKey) {
+    logBlog("warn", "Újrafordítás: GEMINI_API_KEY hiányzik – minden bejegyzés angolul marad.");
+    return { total, translated: 0, failed: total };
+  }
+  logBlog(
+    "info",
+    `Újrafordítás indítása: ${total} lefordítatlan bejegyzés, ${batches} köteg (${BATCH_SIZE}/Gemini-hívás).`
+  );
+
   for (let i = 0; i < posts.length; i += BATCH_SIZE) {
     const slice = posts.slice(i, i + BATCH_SIZE);
     const inputs = slice.map((p) => ({
@@ -282,15 +341,27 @@ export async function translateUntranslated(
       keywords: [],
     }));
     const { items } = await translateBatchWithRetry(inputs, geminiKey);
+    let bt = 0;
+    let bf = 0;
     for (let j = 0; j < slice.length; j++) {
       if (items[j].ok) {
         updateBlogPostTranslation(slice[j].id, items[j].translated);
         translated++;
+        bt++;
       } else {
         failed++;
+        bf++;
       }
     }
+    logBlog(
+      "info",
+      `Újrafordítás köteg ${Math.floor(i / BATCH_SIZE) + 1}/${batches}: +${bt} siker, ${bf} sikertelen (össz.: ${translated}/${total}).`
+    );
     await sleep(batchDelay);
   }
-  return { total: posts.length, translated, failed };
+  logBlog(
+    "success",
+    `Újrafordítás befejezve: ${translated} lefordítva, ${failed} sikertelen (${total} összesen).`
+  );
+  return { total, translated, failed };
 }

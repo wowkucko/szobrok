@@ -42,6 +42,13 @@ const STATUS_LABEL: Record<BlogSource["syncStatus"], string> = {
   cancelled: "Leállítva",
 };
 
+const LOG_COLOR: Record<string, string> = {
+  info: "text-zinc-400",
+  warn: "text-amber-400",
+  error: "text-red-400",
+  success: "text-emerald-400",
+};
+
 export default function AdminBlog() {
   const [sources, setSources] = useState<BlogSource[]>([]);
   const [keywords, setKeywords] = useState<BlogKeyword[]>([]);
@@ -54,6 +61,29 @@ export default function AdminBlog() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [showLog, setShowLog] = useState(false);
+  const [log, setLog] = useState<{ ts: string; level: string; msg: string }[]>([]);
+
+  // Élő frissítés, amíg valamelyik forrás szinkronizálódik.
+  const polling = sources.some(
+    (s) => s.syncStatus === "syncing" || s.syncStatus === "queued"
+  );
+
+  const loadLog = useCallback(async () => {
+    const d = await fetch("/api/admin/blog/log", { cache: "no-store" })
+      .then((r) => r.json())
+      .catch(() => ({ log: [] }));
+    setLog(d.log ?? []);
+  }, []);
+
+  const logOpen = showLog || retranslating || polling;
+  useEffect(() => {
+    if (!logOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadLog();
+    const t = setInterval(loadLog, 2500);
+    return () => clearInterval(t);
+  }, [logOpen, loadLog, retranslating, polling]);
 
   const loadSources = useCallback(async () => {
     const s = await fetch("/api/admin/blog/sources").then((r) => r.json());
@@ -79,10 +109,6 @@ export default function AdminBlog() {
     loadAll();
   }, [loadAll]);
 
-  // Élő frissítés, amíg valamelyik forrás szinkronizálódik.
-  const polling = sources.some(
-    (s) => s.syncStatus === "syncing" || s.syncStatus === "queued"
-  );
   useEffect(() => {
     if (!polling) return;
     const t = setInterval(loadSources, 2500);
@@ -90,8 +116,9 @@ export default function AdminBlog() {
   }, [polling, loadSources]);
 
   function triggerSync(source: string | null) {
-    setStatus("Szinkron elindítva – az állás a listában élőben frissül.");
+    setStatus("Szinkron elindítva – az állás a listában és a naplóban élőben frissül.");
     setError("");
+    setShowLog(true);
     fetch(
       source
         ? `/api/admin/blog/sync?source=${encodeURIComponent(source)}`
@@ -167,6 +194,7 @@ export default function AdminBlog() {
   async function handleRetranslate() {
     if (retranslating) return;
     setRetranslating(true);
+    setShowLog(true);
     setStatus("Újrafordítás elindítva…");
     await fetch("/api/admin/blog/translate", { method: "POST" }).catch(() => {});
     // Poll: amíg csökken a lefordítatlan bejegyzések száma, jelzünk állapotot.
@@ -385,16 +413,25 @@ export default function AdminBlog() {
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-zinc-200">Bejegyzések ({postTotal})</h3>
-          {untranslated > 0 && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleRetranslate}
-              disabled={retranslating}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-700/50 px-3 text-xs text-amber-300 hover:bg-amber-700/10 disabled:opacity-50"
+              onClick={() => setShowLog((v) => !v)}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-700 px-3 text-xs text-zinc-300 hover:bg-zinc-800"
             >
-              <Languages className="h-3.5 w-3.5" />
-              {retranslating ? "Újrafordítás…" : `${untranslated} nem fordított — újrafordítás`}
+              <FileText className="h-3.5 w-3.5" />
+              {showLog ? "Napló elrejtése" : "Napló"}
             </button>
-          )}
+            {untranslated > 0 && (
+              <button
+                onClick={handleRetranslate}
+                disabled={retranslating}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-700/50 px-3 text-xs text-amber-300 hover:bg-amber-700/10 disabled:opacity-50"
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {retranslating ? "Újrafordítás…" : `${untranslated} nem fordított — újrafordítás`}
+              </button>
+            )}
+          </div>
         </div>
         <p className="mt-1 text-xs text-zinc-500">
           A publikált blogbejegyzések. Ha a Gemini épp nem bírta (pl. rate limit), a
@@ -447,6 +484,35 @@ export default function AdminBlog() {
           ))}
         </ul>
       </section>
+
+      {/* Napló */}
+      {showLog && (
+        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-zinc-200">Blog napló (élő)</h3>
+            <span className="text-xs text-zinc-500">
+              A háttérben futó szinkron/fordítás állapota és hibái (pl. Gemini 429/kvóta).
+            </span>
+          </div>
+          <div className="mt-3 max-h-80 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs">
+            {log.length === 0 ? (
+              <p className="text-zinc-600">Nincs naplóbejegyzés.</p>
+            ) : (
+              log.map((e, i) => (
+                <div key={i} className="flex gap-2 py-0.5">
+                  <span className="shrink-0 text-zinc-600">
+                    {new Date(e.ts).toLocaleTimeString("hu-HU")}
+                  </span>
+                  <span className={`shrink-0 uppercase ${LOG_COLOR[e.level] ?? "text-zinc-400"}`}>
+                    {e.level}
+                  </span>
+                  <span className="whitespace-pre-wrap text-zinc-300">{e.msg}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
