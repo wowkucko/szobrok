@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listBlogPosts, deleteBlogPost, listUntranslatedPosts } from "@/lib/db";
+import { listBlogPosts, deleteBlogPost, listUntranslatedPosts, countPostsMissingImages } from "@/lib/db";
 
 /** Bejegyzések listázása (lapozható). */
 export async function GET(request: NextRequest) {
@@ -9,7 +9,12 @@ export async function GET(request: NextRequest) {
     Number.isFinite(limit) ? limit : 50,
     Number.isFinite(offset) ? offset : 0
   );
-  return NextResponse.json({ total, posts, untranslated: listUntranslatedPosts().length });
+  return NextResponse.json({
+    total,
+    posts,
+    untranslated: listUntranslatedPosts().length,
+    missingImages: countPostsMissingImages(),
+  });
 }
 
 /** Bejegyzés törlése. */

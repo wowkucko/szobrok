@@ -13,11 +13,17 @@ export interface CultsCreation {
   creator: string;
 }
 
+interface RawIllustration {
+  imageUrl?: string;
+  position?: number;
+}
+
 interface RawCreation {
   slug: string;
   name?: { en?: string } | string;
   description?: { en?: string } | string;
   illustrationImageUrl?: string;
+  illustrations?: RawIllustration[] | null;
   shortUrl?: string;
   publishedAt?: string;
   creator?: { nick?: string };
@@ -60,6 +66,7 @@ export async function getCultsUserCreations(
             name(locale: EN)
             description(locale: EN)
             illustrationImageUrl
+            illustrations { imageUrl position }
             shortUrl
             publishedAt
             creator { nick }
@@ -93,7 +100,11 @@ export async function getCultsUserCreations(
     for (const c of creations) {
       const title = localeField(c.name) || c.slug;
       const description = localeField(c.description);
-      const image = c.illustrationImageUrl ?? "";
+      // Néha az illustrationImageUrl üres, de az illustrations tömbben ott a kép.
+      const sortedIllus = (c.illustrations ?? [])
+        .filter((i) => i?.imageUrl)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+      const image = c.illustrationImageUrl || sortedIllus[0]?.imageUrl || "";
       const url = `https://cults3d.com/en/design/${c.slug}`;
       results.push({
         slug: c.slug,

@@ -19,6 +19,8 @@ import {
   listUntranslatedPosts,
   listBlogPosts,
   updateBlogPostTranslation,
+  updateBlogPostImages,
+  countPostsMissingImages,
 } from "@/lib/db";
 import { getCultsUserCreations } from "@/lib/cults";
 import { translateBlogPosts, type TranslatedPost } from "@/lib/gemini";
@@ -41,6 +43,9 @@ export function cancelSync(username: string): void {
 
 /** Egyszerre csak egy újrafordítás futhat (a retry-szünetek órákig is tarthatnak). */
 let translateRunning = false;
+
+/** Egyszerre csak egy képjavítás futhat. */
+let imageFixRunning = false;
 
 type Creation = NonNullable<Awaited<ReturnType<typeof getCultsUserCreations>>[number]>;
 
@@ -97,26 +102,44 @@ function sleep(ms: number) {
 
 async function downloadImage(imageUrl: string): Promise<string | null> {
   if (!imageUrl) return null;
-  try {
-    const res = await fetch(imageUrl);
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") ?? "";
-    const raw = new Uint8Array(await res.arrayBuffer());
-    let ext = CONTENT_TYPE_EXT[contentType] ?? (path.extname(imageUrl).toLowerCase() || ".jpg");
-    let data: Uint8Array = raw;
-    const optimized = await optimizeImage(raw, contentType || "image/jpeg");
-    if (optimized) {
-      data = optimized.data as Uint8Array;
-      ext = optimized.ext;
+  // Átmeneti hibák (pl. Cults CDN 429/5xx, hálózati szakadás) ellen újrapróbálunk.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(imageUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+          Referer: "https://cults3d.com/",
+        },
+      });
+      if (res.status === 429 || res.status >= 500) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      if (!res.ok) return null;
+      const contentType = res.headers.get("content-type") ?? "";
+      const raw = new Uint8Array(await res.arrayBuffer());
+      let ext = CONTENT_TYPE_EXT[contentType] ?? (path.extname(imageUrl).toLowerCase() || ".jpg");
+      let data: Uint8Array = raw;
+      const optimized = await optimizeImage(raw, contentType || "image/jpeg");
+      if (optimized) {
+        data = optimized.data as Uint8Array;
+        ext = optimized.ext;
+      }
+      const base = `blog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const name = `${base}${ext}`;
+      mkdirSync(UPLOAD_DIR, { recursive: true });
+      writeFileSync(path.join(UPLOAD_DIR, name), data);
+      return `/api/files/${name}`;
+    } catch {
+      if (attempt < 2) {
+        await sleep(1000 * (attempt + 1));
+        continue;
+      }
+      return null;
     }
-    const base = `blog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const name = `${base}${ext}`;
-    mkdirSync(UPLOAD_DIR, { recursive: true });
-    writeFileSync(path.join(UPLOAD_DIR, name), data);
-    return `/api/files/${name}`;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 /** Kötegelő Gemini fordítás (batch) — egy hívás több bejegyzésre.
@@ -404,5 +427,73 @@ export async function translateUntranslated(
   return { total, translated, failed };
   } finally {
     translateRunning = false;
+  }
+}
+
+/**
+ * Hiányzó képek pótlása meglévő bejegyzéseknél. A Cults3D-ről újra lekéri az
+ * adott forrás összes modelljét, és ahol a bejegyzésnek nincs képe, megpróbálja
+ * letölteni a (most már illustrations-ből is pótolt) képet. Háttérben fut.
+ */
+export async function fixBlogImages(
+  opts: { apiUser?: string; apiKey?: string } = {}
+): Promise<{ fixed: number; failed: number }> {
+  if (imageFixRunning) {
+    logBlog("warn", "Képjavítás már fut – az új kérés figyelmen kívül hagyva.");
+    return { fixed: 0, failed: 0 };
+  }
+  imageFixRunning = true;
+  try {
+    const apiUser = opts.apiUser ?? process.env.CULTS3D_USERNAME;
+    const apiKey = opts.apiKey ?? process.env.CULTS3D_API_KEY;
+    if (!apiUser || !apiKey) {
+      logBlog("error", "Képjavítás: hiányzik a CULTS3D_USERNAME vagy CULTS3D_API_KEY.");
+      return { fixed: 0, failed: 0 };
+    }
+    const sources = listBlogSources();
+    let fixed = 0;
+    let failed = 0;
+    const before = countPostsMissingImages();
+    for (const src of sources) {
+      let creations;
+      try {
+        creations = await getCultsUserCreations(src.username, { apiUser, apiKey, maxPages: 1000 });
+      } catch (e) {
+        logBlog("error", `${src.username}: képjavítás – Cults3D lekérés sikertelen: ${String(e)}`);
+        continue;
+      }
+      const imageBySlug = new Map<string, string>();
+      for (const c of creations) if (c.image) imageBySlug.set(c.slug, c.image);
+      const posts = listBlogPosts(1_000_000, 0, false).posts.filter(
+        (p) => p.source === src.username && (!p.images || p.images.length === 0)
+      );
+      let srcFixed = 0;
+      for (const p of posts) {
+        const imgUrl = imageBySlug.get(p.cultsId);
+        if (!imgUrl) {
+          failed++;
+          continue;
+        }
+        const img = await downloadImage(imgUrl);
+        if (img) {
+          updateBlogPostImages(p.id, [img]);
+          fixed++;
+          srcFixed++;
+        } else {
+          failed++;
+        }
+      }
+      if (posts.length > 0) {
+        logBlog("info", `${src.username}: képjavítás — ${srcFixed} kép pótolva, ${posts.length - srcFixed} sikertelen.`);
+      }
+    }
+    const after = countPostsMissingImages();
+    logBlog(
+      "success",
+      `Képjavítás befejezve: ${fixed} kép pótolva, ${failed} sikertelen. Hiányzó képek: ${before} → ${after}.`
+    );
+    return { fixed, failed };
+  } finally {
+    imageFixRunning = false;
   }
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   FileText,
+  Image as ImageIcon,
   Languages,
   Plus,
   RefreshCw,
@@ -55,7 +56,9 @@ export default function AdminBlog() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postTotal, setPostTotal] = useState(0);
   const [untranslated, setUntranslated] = useState(0);
+  const [missingImages, setMissingImages] = useState(0);
   const [retranslating, setRetranslating] = useState(false);
+  const [imageFixing, setImageFixing] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -102,6 +105,7 @@ export default function AdminBlog() {
     setKeywords(k.keywords ?? []);
     setPosts(p.posts ?? []);
     setUntranslated(p.untranslated ?? 0);
+    setMissingImages(p.missingImages ?? 0);
   }, []);
 
   useEffect(() => {
@@ -231,6 +235,47 @@ export default function AdminBlog() {
     }
     setRetranslating(false);
     setStatus("Újrafordítás: a maximális várakozási idő eltelt.");
+  }
+
+  async function handleFixImages() {
+    if (imageFixing) return;
+    setImageFixing(true);
+    setShowLog(true);
+    setStatus("Képjavítás elindítva – a hiányzó képek pótlása a Cults3D-ről…");
+    await fetch("/api/admin/blog/fix-images", { method: "POST" }).catch(() => {});
+    let prev = -1;
+    let stable = 0;
+    for (let i = 0; i < 720; i++) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const cur = await fetch("/api/admin/blog/posts?limit=1", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d: { missingImages?: number }) => d.missingImages ?? 0)
+        .catch(() => prev);
+      await loadAll();
+      if (cur === 0) {
+        setStatus("Képjavítás kész: minden bejegyzésnek van képe.");
+        setImageFixing(false);
+        return;
+      }
+      if (cur >= prev) {
+        stable++;
+        if (stable >= 3) {
+          setStatus(
+            cur > 0
+              ? `Képjavítás megállt: ${cur} bejegyzésnek még mindig nincs képe (Cults3D elérhetetlen, vagy a modellnél tényleg nincs feltöltve kép).`
+              : "Képjavítás kész."
+          );
+          setImageFixing(false);
+          return;
+        }
+      } else {
+        stable = 0;
+      }
+      prev = cur;
+      setStatus(`Képjavítás folyamatban… még ${cur} bejegyzés kép nélkül.`);
+    }
+    setImageFixing(false);
+    setStatus("Képjavítás: a maximális várakozási idő eltelt.");
   }
 
   function handleStopSource(username: string) {
@@ -434,12 +479,23 @@ export default function AdminBlog() {
             {postTotal > 0 && (
               <button
                 onClick={() => handleRetranslate(true)}
-                disabled={retranslating}
+                disabled={retranslating || imageFixing}
                 title="Az összes bejegyzés újrafordítása a javított (névmegőrző) prompttel – a már lefordított, de elrontott címűek javításához."
                 className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-700 px-3 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
               >
                 <Languages className="h-3.5 w-3.5" />
                 {retranslating ? "Újrafordítás…" : "Összes újrafordítása"}
+              </button>
+            )}
+            {missingImages > 0 && (
+              <button
+                onClick={handleFixImages}
+                disabled={imageFixing || retranslating}
+                title="A kép nélküli bejegyzések hiányzó képeit pótolja a Cults3D-ről (az illustrations mezőből is)."
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-sky-700/50 px-3 text-xs text-sky-300 hover:bg-sky-700/10 disabled:opacity-50"
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                {imageFixing ? "Képjavítás…" : `${missingImages} kép nélkül — képek javítása`}
               </button>
             )}
           </div>

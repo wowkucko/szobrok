@@ -2046,4 +2046,21 @@ export function updateBlogPostTranslation(
     .run(data.title, data.excerpt, data.description, id);
 }
 
+/** Kép utólagos beállítása (képjavítás sikerkor). */
+export function updateBlogPostImages(id: string, images: string[]): void {
+  getDb()
+    .prepare("UPDATE blog_posts SET images = ? WHERE id = ?")
+    .run(JSON.stringify(images), id);
+}
+
+/** Azon bejegyzések száma, amelyeknek nincs (vagy üres) képe. */
+export function countPostsMissingImages(): number {
+  const row = getDb()
+    .prepare(
+      "SELECT COUNT(*) AS c FROM blog_posts WHERE images IS NULL OR images = '' OR images = '[]'"
+    )
+    .get() as { c: number };
+  return row.c;
+}
+
 export { uniqueSlug, touchBlogSource };
