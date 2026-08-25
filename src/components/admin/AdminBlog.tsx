@@ -191,12 +191,12 @@ export default function AdminBlog() {
     await loadAll();
   }
 
-  async function handleRetranslate() {
+  async function handleRetranslate(force = false) {
     if (retranslating) return;
     setRetranslating(true);
     setShowLog(true);
-    setStatus("Újrafordítás elindítva…");
-    await fetch("/api/admin/blog/translate", { method: "POST" }).catch(() => {});
+    setStatus(force ? "Összes bejegyzés újrafordítása (névmegőrzéssel)…" : "Újrafordítás elindítva…");
+    await fetch(`/api/admin/blog/translate${force ? "?all=1" : ""}`, { method: "POST" }).catch(() => {});
     // Poll: amíg csökken a lefordítatlan bejegyzések száma, jelzünk állapotot.
     let prev = -1;
     let stable = 0;
@@ -423,7 +423,7 @@ export default function AdminBlog() {
             </button>
             {untranslated > 0 && (
               <button
-                onClick={handleRetranslate}
+                onClick={() => handleRetranslate(false)}
                 disabled={retranslating}
                 className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-700/50 px-3 text-xs text-amber-300 hover:bg-amber-700/10 disabled:opacity-50"
               >
@@ -431,11 +431,25 @@ export default function AdminBlog() {
                 {retranslating ? "Újrafordítás…" : `${untranslated} nem fordított — újrafordítás`}
               </button>
             )}
+            {postTotal > 0 && (
+              <button
+                onClick={() => handleRetranslate(true)}
+                disabled={retranslating}
+                title="Az összes bejegyzés újrafordítása a javított (névmegőrző) prompttel – a már lefordított, de elrontott címűek javításához."
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-700 px-3 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                <Languages className="h-3.5 w-3.5" />
+                {retranslating ? "Újrafordítás…" : "Összes újrafordítása"}
+              </button>
+            )}
           </div>
         </div>
         <p className="mt-1 text-xs text-zinc-500">
           A publikált blogbejegyzések. Ha a Gemini épp nem bírta (pl. rate limit), a
-          bejegyzés angolul maradt – a fenti gombbal később újrafordítható. A törlés végleges.
+          bejegyzés angolul maradt – a fenti gombbal később újrafordítható. A „Összes
+          újrafordítása” a már lefordított bejegyzéseket is újrafordítja a javított
+          (sajátneveket megőrző) prompttel – ezzel javíthatók a rosszul fordított címek.
+          A törlés végleges.
         </p>
         <ul className="mt-4 divide-y divide-zinc-800">
           {posts.length === 0 && (

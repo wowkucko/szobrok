@@ -36,6 +36,7 @@ A feladatod: a megadott 3D nyomtatott modell (Cults3D) angol címét és leírá
 A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns).
 A bejegyzés legyen 2-4 rövid bekezdés, barátságos hangvételű, mintha egy kézműves műhely mutatná be a modellt.
 Ne említsd a "Cults3D" szót kötelezően, de ha a forrás fontos, egy természetes utalás megengedett.
+FONTOS: A címben és a szövegben előforduló sajátneveket — személyek, karakterek, márkák, termék‑/modellnevek, figurák nevei — NE fordítsd le és NE torzítsd el (ne magyarosítsd, ne átírd); tartsd meg őket pontosan az eredeti (angol) alakjukban. Csak a környező leíró szöveget fordítsd magyarra. Ha a cím gyakorlatilag csak a figura nevéből áll, hagyd a címet az eredeti névvel (esetleg rövid magyar körülírással kiegészítve, de a név változatlan marad).
 
 Kulcsszavak: ${keywordList}
 
@@ -113,6 +114,7 @@ export async function translateBlogPosts(
 A feladatod: az alábbi 3D nyomtatott modellek (Cults3D) angol címét és leírását fordítsd le természetes, olvasmányos magyar nyelvre, és írj belőlük vonzó blogbejegyzéseket.
 A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns).
 Minden bejegyzés legyen 2-4 rövid bekezdés, barátságos hangvételű. Ne emlékeztess kötelezően a "Cults3D" szóra.
+FONTOS: A címben és a szövegben előforduló sajátneveket — személyek, karakterek, márkák, termék‑/modellnevek, figurák nevei — NE fordítsd le és NE torzítsd el (ne magyarosítsd, ne átírd); tartsd meg őket pontosan az eredeti (angol) alakjukban. Csak a környező leíró szöveget fordítsd magyarra. Ha egy cím csak a figura nevéből áll, hagyd azt az eredeti névvel (esetleg rövid magyar körülírással, de a név változatlan marad).
 
 Kulcsszavak: ${keywordList}
 

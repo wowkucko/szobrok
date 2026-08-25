@@ -17,6 +17,7 @@ import {
   updateBlogSourceSync,
   countBlogPostsBySource,
   listUntranslatedPosts,
+  listBlogPosts,
   updateBlogPostTranslation,
 } from "@/lib/db";
 import { getCultsUserCreations } from "@/lib/cults";
@@ -338,7 +339,7 @@ export async function syncAllSources(opts: SyncOptions = {}): Promise<SyncResult
  * Kötegelten, háttérben fut — a Gemini-kvótát kímélve.
  */
 export async function translateUntranslated(
-  opts: { geminiKey?: string; batchDelayMs?: number } = {}
+  opts: { geminiKey?: string; batchDelayMs?: number; force?: boolean } = {}
 ): Promise<{ total: number; translated: number; failed: number }> {
   if (translateRunning) {
     logBlog("warn", "Újrafordítás már fut – az új kérés figyelmen kívül hagyva.");
@@ -348,14 +349,17 @@ export async function translateUntranslated(
   try {
     const geminiKey = opts.geminiKey ?? process.env.GEMINI_API_KEY;
     const batchDelay = opts.batchDelayMs && opts.batchDelayMs > 0 ? opts.batchDelayMs : 400;
-    const posts = listUntranslatedPosts();
+    // force esetén a már lefordított (pl. elrontott című) bejegyzéseket is újrafordítjuk.
+    const posts = opts.force
+      ? listBlogPosts(1_000_000, 0, false).posts
+      : listUntranslatedPosts();
     let translated = 0;
     let failed = 0;
 
     const total = posts.length;
     const batches = Math.ceil(total / BATCH_SIZE);
     if (total === 0) {
-      logBlog("info", "Újrafordítás: nincs lefordítatlan bejegyzés.");
+      logBlog("info", "Újrafordítás: nincs újrafordítandó bejegyzés.");
       return { total: 0, translated: 0, failed: 0 };
     }
     if (!geminiKey) {
@@ -364,7 +368,7 @@ export async function translateUntranslated(
     }
     logBlog(
       "info",
-      `Újrafordítás indítása: ${total} lefordítatlan bejegyzés, ${batches} köteg (${BATCH_SIZE}/Gemini-hívás).`
+      `${opts.force ? "Összes bejegyzés újrafordítása" : "Újrafordítás"} indítása: ${total} bejegyzés, ${batches} köteg (${BATCH_SIZE}/Gemini-hívás).`
     );
 
   for (let i = 0; i < posts.length; i += BATCH_SIZE) {
