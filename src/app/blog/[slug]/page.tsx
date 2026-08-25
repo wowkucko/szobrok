@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getBlogPostBySlug } from "@/lib/db";
-import { SITE_NAME } from "@/lib/data";
+import { getBlogPostBySlug, getRelatedPosts } from "@/lib/db";
+import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BlogCard from "@/components/BlogCard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +17,27 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPostBySlug(slug);
-  if (!post) return { title: `Blog | ${SITE_NAME}` };
+  if (!post) return { title: "Blog" };
+  const desc = post.excerpt || post.description.slice(0, 160);
   return {
-    title: `${post.title} | ${SITE_NAME}`,
-    description: post.excerpt || post.description.slice(0, 160),
+    title: post.title,
+    description: desc,
+    alternates: { canonical: `/blog/${post.slug}` },
+    robots: post.translated ? undefined : { index: false, follow: false },
     openGraph: {
-      title: post.title,
-      description: post.excerpt || post.description.slice(0, 160),
-      images: post.images.length ? [post.images[0]] : [],
       type: "article",
+      url: `/blog/${post.slug}`,
+      siteName: SITE_NAME,
+      title: post.title,
+      description: desc,
+      images: post.images.length ? [post.images[0]] : [],
+      publishedTime: new Date(post.createdAt).toISOString(),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description: desc,
+      images: post.images.length ? [post.images[0]] : [],
     },
   };
 }
@@ -37,12 +50,34 @@ export default async function BlogPostPage({
   const { slug } = await params;
   const post = getBlogPostBySlug(slug);
   if (!post) notFound();
+  const related = getRelatedPosts(slug, 3);
 
   const paragraphs = post.description.split(/\n{2,}/).filter((p) => p.trim());
+
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "@id": `${SITE_URL}/blog/${post.slug}#article`,
+    headline: post.title,
+    description: post.excerpt || post.description.slice(0, 160),
+    image: post.images.length
+      ? absoluteUrl(post.images[0])
+      : absoluteUrl("/images/og-default.png"),
+    datePublished: new Date(post.createdAt).toISOString(),
+    dateModified: new Date(post.createdAt).toISOString(),
+    inLanguage: "hu-HU",
+    author: { "@type": "Person", name: post.source },
+    publisher: { "@id": `${SITE_URL}/#organization` },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/blog/${post.slug}` },
+  };
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
       <Navbar />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       <main className="mx-auto max-w-3xl flex-1 px-6 py-14">
         <Link
           href="/blog"
@@ -105,6 +140,17 @@ export default async function BlogPostPage({
               Megtekintem a Cults3D-on
               <ExternalLink className="h-4 w-4" />
             </a>
+          </div>
+        )}
+
+        {related.length > 0 && (
+          <div className="mt-12 border-t border-zinc-800 pt-8">
+            <h2 className="text-xl font-semibold text-zinc-100">Kapcsolódó bejegyzések</h2>
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {related.map((rp) => (
+                <BlogCard key={rp.id} post={rp} priority={false} />
+              ))}
+            </div>
           </div>
         )}
 

@@ -5,7 +5,7 @@ import BlogCard from "./BlogCard";
 import { listBlogPosts } from "@/lib/db";
 
 export default async function BlogPreview() {
-  const { posts } = listBlogPosts(3, 0);
+  const { posts } = listBlogPosts(3, 0, true);
   if (posts.length === 0) return null;
 
   return (

@@ -1,22 +1,33 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { FileText } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Pagination from "@/components/Pagination";
+import BlogControls from "@/components/BlogControls";
 import { listBlogPosts } from "@/lib/db";
-import { SITE_NAME } from "@/lib/data";
+import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Blog | ${SITE_NAME}`,
-  description:
-    "3D nyomtatott, kézzel festett szobrok és gyűjtői figurák inspirációi, tervezői bemutatók és kedvezmények a műhely blogján.",
-};
+const PER_PAGE_OPTIONS = [9, 12, 18, 24];
+const DEFAULT_PER = 9;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const sp = await searchParams;
+  const req = Math.max(1, Number(sp.page) || 1);
+  return {
+    title: `Blog | ${SITE_NAME}`,
+    description:
+      "3D nyomtatott, kézzel festett szobrok és gyűjtői figurák inspirációi, tervezői bemutatók és kedvezmények a műhely blogján.",
+    alternates: { canonical: req <= 1 ? "/blog" : `/blog?page=${req}` },
+  };
+}
 
 export const dynamic = "force-dynamic";
-
-/** Hány bejegyzés jelenik meg a blog listázó oldalon. */
-const PAGE_SIZE = 9;
 
 export default async function BlogPage({
   searchParams,
@@ -25,19 +36,49 @@ export default async function BlogPage({
 }) {
   const params = await searchParams;
   const requestedPage = Math.max(1, Number(params.page) || 1);
+  const search = typeof params.q === "string" ? params.q.trim() : "";
+  const pageSize = PER_PAGE_OPTIONS.includes(Number(params.perPage))
+    ? Number(params.perPage)
+    : DEFAULT_PER;
 
-  const first = listBlogPosts(PAGE_SIZE, (requestedPage - 1) * PAGE_SIZE);
-  const pageCount = Math.max(1, Math.ceil(first.total / PAGE_SIZE));
+  const first = listBlogPosts(pageSize, (requestedPage - 1) * pageSize, true, search || undefined);
+  const pageCount = Math.max(1, Math.ceil(first.total / pageSize));
   const safePage = Math.min(requestedPage, pageCount);
   const { total, posts } =
     safePage === requestedPage
       ? first
-      : listBlogPosts(PAGE_SIZE, (safePage - 1) * PAGE_SIZE);
+      : listBlogPosts(pageSize, (safePage - 1) * pageSize, true, search || undefined);
 
-  const buildHref = (p: number) => (p <= 1 ? "/blog" : `/blog?page=${p}`);
+  const buildHref = (p: number) => {
+    const sp = new URLSearchParams();
+    if (p > 1) sp.set("page", String(p));
+    if (search) sp.set("q", search);
+    if (pageSize !== DEFAULT_PER) sp.set("perPage", String(pageSize));
+    const s = sp.toString();
+    return s ? `/blog?${s}` : "/blog";
+  };
+  const prevHref = safePage > 1 ? buildHref(safePage - 1) : null;
+  const nextHref = safePage < pageCount ? buildHref(safePage + 1) : null;
+
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: posts.map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/blog/${p.slug}`,
+      name: p.title,
+    })),
+  };
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
+      {prevHref && <link rel="prev" href={prevHref} />}
+      {nextHref && <link rel="next" href={nextHref} />}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
       <Navbar />
       <main className="flex-1">
         <header className="border-b border-zinc-800/60 bg-[radial-gradient(ellipse_at_top,rgba(217,119,6,0.08),transparent_60%)]">
@@ -56,11 +97,23 @@ export default async function BlogPage({
         </header>
 
         <div className="mx-auto max-w-6xl px-6 py-12">
+          <div className="mb-8">
+            <Suspense fallback={null}>
+              <BlogControls perPageOptions={PER_PAGE_OPTIONS} />
+            </Suspense>
+            {search && total > 0 && (
+              <p className="mt-3 text-sm text-zinc-500">
+                {total} találat a „{search}” kifejezésre.
+              </p>
+            )}
+          </div>
           {total === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/40 py-20 text-center">
               <FileText className="h-10 w-10 text-zinc-700" />
               <p className="mt-4 text-sm text-zinc-500">
-                Még nincsenek bejegyzések. Hamarosan érkeznek az első írások.
+                {search
+                  ? `Nincs találat a „${search}” keresésre.`
+                  : "Még nincsenek bejegyzések. Hamarosan érkeznek az első írások."}
               </p>
             </div>
           ) : (

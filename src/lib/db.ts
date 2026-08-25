@@ -1872,14 +1872,30 @@ export function deleteBlogKeyword(keyword: string): void {
   getDb().prepare("DELETE FROM blog_keywords WHERE keyword = ?").run(keyword);
 }
 
-export function listBlogPosts(limit = 20, offset = 0): { total: number; posts: BlogPost[] } {
+export function listBlogPosts(
+  limit = 20,
+  offset = 0,
+  onlyTranslated = false,
+  search?: string
+): { total: number; posts: BlogPost[] } {
   const db = getDb();
-  const total = (db.prepare("SELECT COUNT(*) AS c FROM blog_posts").get() as { c: number }).c;
+  const clauses: string[] = [];
+  const args: string[] = [];
+  if (onlyTranslated) clauses.push("translated = 1");
+  if (search && search.trim()) {
+    clauses.push("(title LIKE ? OR excerpt LIKE ? OR description LIKE ?)");
+    const like = `%${search.trim()}%`;
+    args.push(like, like, like);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const total = (
+    db.prepare(`SELECT COUNT(*) AS c FROM blog_posts ${where}`).get(...(args as [])) as { c: number }
+  ).c;
   const rows = db
     .prepare(
-      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
+      `SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     )
-    .all(limit, offset) as {
+    .all(...args, limit, offset) as {
     id: string; source: string; cults_id: string; slug: string; title: string;
     excerpt: string; description: string; images: string; source_url: string;
     published_at: string; created_at: string; translated: number;
@@ -1892,6 +1908,45 @@ export function listBlogPosts(limit = 20, offset = 0): { total: number; posts: B
     translated: r.translated === 1,
   }));
   return { total, posts };
+}
+
+const STOPWORDS = new Set([
+  "a", "az", "is", "és", "vagy", "de", "ha", "nem", "egy", "ez", "ezt", "azt",
+  "ami", "ami", "amely", "mint", "van", "vannak", "meg", "is", "így", "oda",
+  "is", "is", "le", "ki", "be", "fel", "meg", "el", "át", "össze", "szét",
+  "egyedi", "legjobb", "más", "másik", "saját", "nagyon", "kicsi", "nagy",
+]);
+
+function tokenize(text: string): string[] {
+  return (text.toLowerCase().match(/[a-záéíóöőúüű0-9]+/g) ?? [])
+    .filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+}
+
+/**
+ * Kapcsolódó bejegyzések a részletes oldalhoz: a már lefordított, egyéb
+ * bejegyzések közül a cím+kivonat+szöveg token-átfedése alapján a legjobban
+ * illeszkedők. Egyszerű, szótáralapú hasonlóság (cím súlyozva).
+ */
+export function getRelatedPosts(slug: string, limit = 3): BlogPost[] {
+  const current = getBlogPostBySlug(slug);
+  if (!current) return [];
+  const { posts } = listBlogPosts(200, 0, true);
+  const titleTokens = new Set(tokenize(current.title));
+  const bodyTokens = tokenize(current.title + " " + current.excerpt + " " + current.description);
+  const scored = posts
+    .filter((p) => p.slug !== slug)
+    .map((p) => {
+      const tTokens = new Set(tokenize(p.title));
+      const bTokens = tokenize(p.title + " " + p.excerpt + " " + p.description);
+      let score = 0;
+      for (const t of tTokens) if (titleTokens.has(t)) score += 3;
+      for (const t of bTokens) if (bodyTokens.includes(t)) score += 1;
+      return { p, score };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+  return scored.map((x) => x.p);
 }
 
 export function getBlogPostBySlug(slug: string): BlogPost | null {
