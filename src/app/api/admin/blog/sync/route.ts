@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listBlogSources } from "@/lib/db";
+import { logBlog } from "@/lib/blogLog";
 import { syncSource, syncAllSources, cancelSync } from "@/lib/blogSync";
 
 /**
@@ -22,11 +23,11 @@ export async function POST(request: NextRequest) {
 
   if (source) {
     void syncSource(source, { maxNew: batch || undefined }).catch((err) =>
-      console.error(`[blog] ${source} szinkron hiba:`, err)
+      logBlog("error", `Szinkron hiba (${source}): ${String(err)}`)
     );
   } else {
     void syncAllSources({ maxNew: batch || undefined }).catch((err) =>
-      console.error("[blog] szinkron hiba:", err)
+      logBlog("error", `Szinkron hiba: ${String(err)}`)
     );
   }
   return NextResponse.json({ ok: true, started: true });

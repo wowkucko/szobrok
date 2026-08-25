@@ -146,7 +146,8 @@ async function downloadImage(imageUrl: string): Promise<string | null> {
  *  Újrapróbálás 429 / hálózati hiba esetén backoffal. */
 async function translateBatchWithRetry(
   inputs: { title: string; description: string; keywords: string[] }[],
-  geminiKey: string | undefined
+  geminiKey: string | undefined,
+  loopOnQuota = true
 ): Promise<{ items: { translated: TranslatedPost; ok: boolean }[] }> {
   if (!geminiKey || inputs.length === 0) {
     if (!geminiKey) logBlog("warn", "Kötegelő fordítás kihagyva: hiányzik a GEMINI_API_KEY.");
@@ -164,6 +165,7 @@ async function translateBatchWithRetry(
     })),
   });
 
+  const MAX_ATTEMPTS = loopOnQuota ? Infinity : 8;
   let attempt = 0;
   for (;;) {
     try {
@@ -175,6 +177,17 @@ async function translateBatchWithRetry(
         logBlog(
           "error",
           `Kötegelő fordítás végleg sikertelen (nem újrapróbálható): ${describeGeminiError(e)}`
+        );
+        break;
+      }
+      const isQuota = /429|rate|RESOURCE_EXHAUSTED/i.test(msg);
+      // Szinkron importnál a kvóta hiba nem akadályozhatja a mentést: a
+      // bejegyzés angolul marad (translated = 0), később újrafordítva.
+      // Hálózati hiba esetén is csak véges próba.
+      if (!loopOnQuota && (isQuota || attempt >= MAX_ATTEMPTS - 1)) {
+        logBlog(
+          "warn",
+          `Fordítás most nem sikerült (${isQuota ? "Gemini-kvóta" : "hálózati hiba"}) – a bejegyzés angolul marad, később újrafordítva. ${describeGeminiError(e)}`
         );
         break;
       }
@@ -236,8 +249,9 @@ export async function syncSource(
   // Friss indítás: ne legyen leállítva az előző futásból.
   cancelled.delete(username);
 
-  updateBlogSourceSync(username, { status: "syncing", progress: 0, total: 0, error: null });
+  logBlog("info", `${username}: szinkron indítása…`);
   try {
+    updateBlogSourceSync(username, { status: "syncing", progress: 0, total: 0, error: null });
     const creations = await getCultsUserCreations(username, {
       apiUser,
       apiKey,
@@ -263,7 +277,7 @@ export async function syncSource(
         description: b.description,
         keywords,
       }));
-      const { items } = await translateBatchWithRetry(inputs, geminiKey);
+      const { items } = await translateBatchWithRetry(inputs, geminiKey, false);
       let justNow = 0;
       for (let i = 0; i < buffer.length; i++) {
         if (cancelled.has(username)) {
@@ -346,6 +360,11 @@ export async function syncSource(
 /** Az összes regisztrált forrás szinkronja (napi cron). Háttérben fut. */
 export async function syncAllSources(opts: SyncOptions = {}): Promise<SyncResult[]> {
   const sources = listBlogSources();
+  if (sources.length === 0) {
+    logBlog("warn", "Szinkron: nincs beállított forrás (blog_sources üres) – nem történt import.");
+    return [];
+  }
+  logBlog("info", `Összes forrás szinkronja indul (${sources.length} forrás)…`);
   const results: SyncResult[] = [];
   for (const s of sources) {
     try {
@@ -354,6 +373,8 @@ export async function syncAllSources(opts: SyncOptions = {}): Promise<SyncResult
       results.push({ username: s.username, imported: 0, skipped: 0, remaining: -1 });
     }
   }
+  const totalImported = results.reduce((a, r) => a + r.imported, 0);
+  logBlog("success", `Összes forrás szinkronja befejezve: ${totalImported} új bejegyzés.`);
   return results;
 }
 
