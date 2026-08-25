@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getProducts } from "@/lib/db";
+import { getProducts, listBlogPosts } from "@/lib/db";
 import { SITE_URL, absoluteUrl, ogImageFor } from "@/lib/seo";
 
 // Google kép-sitemap: URL-enként legfeljebb ennyi kép (bélyegkép + továbbiak).
@@ -58,6 +58,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      url: `${SITE_URL}/blog`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.7,
+    },
+    {
       url: `${SITE_URL}/aszf`,
       lastModified: new Date(),
       changeFrequency: "yearly",
@@ -71,5 +77,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     ...categoryUrls,
     ...productUrls,
+    ...blogUrls(),
   ];
+}
+
+function blogUrls(): MetadataRoute.Sitemap {
+  const { posts } = listBlogPosts(500, 0);
+  return posts.map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.createdAt),
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+    images: post.images.length ? post.images.map((img) => absoluteUrl(img)) : undefined,
+  }));
 }

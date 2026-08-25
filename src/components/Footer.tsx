@@ -42,6 +42,12 @@ export default function Footer({ showNewsletter = true }: FooterProps) {
             Megvásárolható alkotások
           </Link>
           <Link
+            href="/blog"
+            className="transition-colors hover:text-amber-500"
+          >
+            Blog
+          </Link>
+          <Link
             href="/aszf"
             className="transition-colors hover:text-amber-500"
           >

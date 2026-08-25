@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type {
   PrintTechnology,
@@ -204,10 +205,47 @@ const CURRENT_PROJECT_SCHEMA = `
   CREATE TABLE IF NOT EXISTS current_project (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     title TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    image TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL,
+    image_name TEXT NOT NULL,
     progress INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL
+  )
+`;
+
+// ---- Blog (Cults3D -> Gemini automatikus blog) ----
+const BLOG_SOURCES_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS blog_sources (
+    username TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    last_synced_at TEXT,
+    sync_status TEXT NOT NULL DEFAULT 'idle',
+    sync_progress INTEGER NOT NULL DEFAULT 0,
+    sync_total INTEGER NOT NULL DEFAULT 0,
+    sync_error TEXT
+  )
+`;
+
+const BLOG_POSTS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS blog_posts (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    cults_id TEXT NOT NULL UNIQUE,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    excerpt TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    images TEXT NOT NULL DEFAULT '[]',
+    source_url TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    translated INTEGER NOT NULL DEFAULT 1
+  )
+`;
+
+const BLOG_KEYWORDS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS blog_keywords (
+    keyword TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL
   )
 `;
 
@@ -337,6 +375,35 @@ function getDb(): DatabaseSync {
   db.exec(REFERRALS_SCHEMA);
   db.exec(COUPONS_SCHEMA);
   db.exec(CURRENT_PROJECT_SCHEMA);
+  db.exec(BLOG_SOURCES_SCHEMA);
+  db.exec(BLOG_POSTS_SCHEMA);
+  db.exec(BLOG_KEYWORDS_SCHEMA);
+  // Blog táblák kiterjesztése a szinkron-állapot és a translated zászló oszlopokkal
+  try {
+    const sourceCols = db
+      .prepare("PRAGMA table_info(blog_sources)")
+      .all() as { name: string }[];
+    const sourceMissing = ["sync_status", "sync_progress", "sync_total", "sync_error"].filter(
+      (c) => !sourceCols.some((s) => s.name === c)
+    );
+    for (const c of sourceMissing) {
+      const def =
+        c === "sync_status"
+          ? "TEXT NOT NULL DEFAULT 'idle'"
+          : c === "sync_error"
+          ? "TEXT"
+          : "INTEGER NOT NULL DEFAULT 0";
+      db.exec(`ALTER TABLE blog_sources ADD COLUMN ${c} ${def}`);
+    }
+    const postCols = db
+      .prepare("PRAGMA table_info(blog_posts)")
+      .all() as { name: string }[];
+    if (!postCols.some((p) => p.name === "translated")) {
+      db.exec("ALTER TABLE blog_posts ADD COLUMN translated INTEGER NOT NULL DEFAULT 1");
+    }
+  } catch {
+    // nem kritikus
+  }
   // Régebbi coupons tábla kiterjesztése a discount oszloppal (ha még nincs)
   try {
     const cols = db
@@ -1665,3 +1732,263 @@ export function deleteCurrentProject(): boolean {
   getDb().prepare("DELETE FROM current_project WHERE id = 1").run();
   return true;
 }
+
+// ---- Blog (Cults3D -> Gemini automatikus blog) ----
+export type BlogSyncStatus = "idle" | "queued" | "syncing" | "done" | "error" | "cancelled";
+
+export interface BlogSource {
+  username: string;
+  createdAt: string;
+  lastSyncedAt: string | null;
+  syncStatus: BlogSyncStatus;
+  syncProgress: number;
+  syncTotal: number;
+  syncError: string | null;
+}
+
+export interface BlogPost {
+  id: string;
+  source: string;
+  cultsId: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  description: string;
+  images: string[];
+  sourceUrl: string;
+  publishedAt: string;
+  createdAt: string;
+  translated: boolean;
+}
+
+export interface BlogKeyword {
+  keyword: string;
+}
+
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function uniqueSlug(base: string): string {
+  const root = slugify(base) || "bejegyzes";
+  const db = getDb();
+  const exists = (s: string) =>
+    db.prepare("SELECT 1 FROM blog_posts WHERE slug = ?").get(s) !== undefined;
+  if (!exists(root)) return root;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${root}-${i}`;
+    if (!exists(candidate)) return candidate;
+  }
+  return `${root}-${randomUUID().slice(0, 8)}`;
+}
+
+export function listBlogSources(): BlogSource[] {
+  return (getDb()
+    .prepare(
+      "SELECT username, created_at, last_synced_at, sync_status, sync_progress, sync_total, sync_error FROM blog_sources ORDER BY created_at ASC"
+    )
+    .all() as {
+      username: string; created_at: string; last_synced_at: string | null;
+      sync_status: string; sync_progress: number; sync_total: number; sync_error: string | null;
+    }[]).map((r) => ({
+    username: r.username,
+    createdAt: r.created_at,
+    lastSyncedAt: r.last_synced_at,
+    syncStatus: (r.sync_status as BlogSyncStatus) ?? "idle",
+    syncProgress: r.sync_progress ?? 0,
+    syncTotal: r.sync_total ?? 0,
+    syncError: r.sync_error ?? null,
+  }));
+}
+
+export function addBlogSource(username: string): BlogSource {
+  const u = username.trim();
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      "INSERT INTO blog_sources (username, created_at, last_synced_at, sync_status, sync_progress, sync_total) VALUES (?, ?, NULL, 'queued', 0, 0) ON CONFLICT(username) DO UPDATE SET sync_status = 'queued', sync_progress = 0, sync_total = 0, sync_error = NULL"
+    )
+    .run(u, now);
+  return { username: u, createdAt: now, lastSyncedAt: null, syncStatus: "queued", syncProgress: 0, syncTotal: 0, syncError: null };
+}
+
+/** Szinkron állapot frissítése (háttérfolyamat jelentése). */
+export function updateBlogSourceSync(
+  username: string,
+  patch: Partial<{ status: BlogSyncStatus; progress: number; total: number; error: string | null }>
+): void {
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (patch.status !== undefined) { sets.push("sync_status = ?"); vals.push(patch.status); }
+  if (patch.progress !== undefined) { sets.push("sync_progress = ?"); vals.push(patch.progress); }
+  if (patch.total !== undefined) { sets.push("sync_total = ?"); vals.push(patch.total); }
+  if (patch.error !== undefined) { sets.push("sync_error = ?"); vals.push(patch.error); }
+  if (!sets.length) return;
+  vals.push(username);
+  getDb()
+    .prepare(`UPDATE blog_sources SET ${sets.join(", ")} WHERE username = ?`)
+    .run(...(vals as (string | number | null)[]));
+}
+
+export function deleteBlogPostsBySource(username: string): number {
+  const res = getDb()
+    .prepare("DELETE FROM blog_posts WHERE source = ?")
+    .run(username) as { changes: number };
+  return res.changes;
+}
+
+export function deleteBlogSource(username: string): void {
+  // Kaszkád: a forrással együtt a bejegyzései is törlődnek.
+  deleteBlogPostsBySource(username);
+  getDb().prepare("DELETE FROM blog_sources WHERE username = ?").run(username);
+}
+
+function touchBlogSource(username: string): void {
+  getDb()
+    .prepare("UPDATE blog_sources SET last_synced_at = ? WHERE username = ?")
+    .run(new Date().toISOString(), username);
+}
+
+export function listBlogKeywords(): BlogKeyword[] {
+  return (getDb()
+    .prepare("SELECT keyword FROM blog_keywords ORDER BY keyword ASC")
+    .all() as { keyword: string }[]).map((r) => ({ keyword: r.keyword }));
+}
+
+export function addBlogKeyword(keyword: string): BlogKeyword {
+  const k = keyword.trim();
+  getDb()
+    .prepare("INSERT INTO blog_keywords (keyword, created_at) VALUES (?, ?) ON CONFLICT(keyword) DO NOTHING")
+    .run(k, new Date().toISOString());
+  return { keyword: k };
+}
+
+export function deleteBlogKeyword(keyword: string): void {
+  getDb().prepare("DELETE FROM blog_keywords WHERE keyword = ?").run(keyword);
+}
+
+export function listBlogPosts(limit = 20, offset = 0): { total: number; posts: BlogPost[] } {
+  const db = getDb();
+  const total = (db.prepare("SELECT COUNT(*) AS c FROM blog_posts").get() as { c: number }).c;
+  const rows = db
+    .prepare(
+      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    )
+    .all(limit, offset) as {
+    id: string; source: string; cults_id: string; slug: string; title: string;
+    excerpt: string; description: string; images: string; source_url: string;
+    published_at: string; created_at: string; translated: number;
+  }[];
+  const posts = rows.map((r) => ({
+    id: r.id, source: r.source, cultsId: r.cults_id, slug: r.slug, title: r.title,
+    excerpt: r.excerpt, description: r.description,
+    images: safeJsonParse<string[]>(r.images, []),
+    sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
+    translated: r.translated === 1,
+  }));
+  return { total, posts };
+}
+
+export function getBlogPostBySlug(slug: string): BlogPost | null {
+  const r = getDb()
+    .prepare(
+      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts WHERE slug = ?"
+    )
+    .get(slug) as
+    | { id: string; source: string; cults_id: string; slug: string; title: string;
+        excerpt: string; description: string; images: string; source_url: string;
+        published_at: string; created_at: string; translated: number; }
+    | undefined;
+  if (!r) return null;
+  return {
+    id: r.id, source: r.source, cultsId: r.cults_id, slug: r.slug, title: r.title,
+    excerpt: r.excerpt, description: r.description,
+    images: safeJsonParse<string[]>(r.images, []),
+    sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
+    translated: r.translated === 1,
+  };
+}
+
+export function getBlogPostByCultsId(cultsId: string): BlogPost | null {
+  const r = getDb().prepare("SELECT id FROM blog_posts WHERE cults_id = ?").get(cultsId) as
+    | { id: string }
+    | undefined;
+  if (!r) return null;
+  return getBlogPostBySlug(
+    (getDb().prepare("SELECT slug FROM blog_posts WHERE id = ?").get(r.id) as { slug: string }).slug
+  );
+}
+
+export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt">): { status: "inserted" | "exists" } {
+  const db = getDb();
+  const exists = db.prepare("SELECT 1 FROM blog_posts WHERE cults_id = ?").get(input.cultsId);
+  if (exists) return { status: "exists" };
+  db.prepare(
+    `INSERT INTO blog_posts (id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    randomUUID(),
+    input.source,
+    input.cultsId,
+    input.slug,
+    input.title,
+    input.excerpt,
+    input.description,
+    JSON.stringify(input.images),
+    input.sourceUrl,
+    input.publishedAt,
+    new Date().toISOString(),
+    input.translated ? 1 : 0
+  );
+  return { status: "inserted" };
+}
+
+export function deleteBlogPost(id: string): void {
+  getDb().prepare("DELETE FROM blog_posts WHERE id = ?").run(id);
+}
+
+/** Egy forráshoz tartozó bejegyzések száma (folyamatjelzőhöz). */
+export function countBlogPostsBySource(username: string): number {
+  return (getDb()
+    .prepare("SELECT COUNT(*) AS c FROM blog_posts WHERE source = ?")
+    .get(username) as { c: number }).c;
+}
+
+/** A még le nem fordított (fallbackként angolul maradt) bejegyzések. */
+export function listUntranslatedPosts(): BlogPost[] {
+  const rows = getDb()
+    .prepare(
+      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts WHERE translated = 0"
+    )
+    .all() as {
+      id: string; source: string; cults_id: string; slug: string; title: string;
+      excerpt: string; description: string; images: string; source_url: string;
+      published_at: string; created_at: string; translated: number;
+    }[];
+  return rows.map((r) => ({
+    id: r.id, source: r.source, cultsId: r.cults_id, slug: r.slug, title: r.title,
+    excerpt: r.excerpt, description: r.description,
+    images: safeJsonParse<string[]>(r.images, []),
+    sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
+    translated: r.translated === 1,
+  }));
+}
+
+/** Fordítás utólagos frissítése (újrafordítás sikerkor). */
+export function updateBlogPostTranslation(
+  id: string,
+  data: { title: string; excerpt: string; description: string }
+): void {
+  getDb()
+    .prepare(
+      "UPDATE blog_posts SET title = ?, excerpt = ?, description = ?, translated = 1 WHERE id = ?"
+    )
+    .run(data.title, data.excerpt, data.description, id);
+}
+
+export { uniqueSlug, touchBlogSource };

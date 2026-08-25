@@ -7,6 +7,7 @@ export const NAV_LINKS = [
   { label: "Egyedi megrendelés", href: "#megrendeles" },
   { label: "Rólam", href: "#rolam" },
   { label: "Kapcsolat", href: "#kapcsolat" },
+  { label: "Blog", href: "#blog" },
   { label: "Szerezz kedvezményt", href: "#kedvezmeny" },
 ];
 

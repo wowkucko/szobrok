@@ -8,6 +8,7 @@ import CommissionProcess from "@/components/CommissionProcess";
 import About from "@/components/About";
 import NewsletterForm from "@/components/NewsletterForm";
 import ContactForm from "@/components/ContactForm";
+import BlogPreview from "@/components/BlogPreview";
 import DiscountCta from "@/components/DiscountCta";
 import Footer from "@/components/Footer";
 
@@ -52,6 +53,7 @@ export default function Home() {
           </div>
         </section>
         <ContactForm />
+        <BlogPreview />
         <DiscountCta />
       </main>
       <Footer showNewsletter={false} />

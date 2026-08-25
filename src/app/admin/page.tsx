@@ -3,6 +3,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Database,
+  FileText,
   Hammer,
   ImageOff,
   Inbox,
@@ -25,6 +26,7 @@ import AdminProductTable from "@/components/admin/AdminProductTable";
 import AdminMessages from "@/components/admin/AdminMessages";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminCurrentProject from "@/components/admin/AdminCurrentProject";
+import AdminBlog from "@/components/admin/AdminBlog";
 import { auth, signOut } from "@/auth";
 
 export const metadata: Metadata = {
@@ -45,7 +47,8 @@ export default async function AdminPage({
   const tab =
     tabRaw === "messages" ||
     tabRaw === "coupons" ||
-    tabRaw === "current"
+    tabRaw === "current" ||
+    tabRaw === "blog"
       ? tabRaw
       : "products";
 
@@ -214,6 +217,17 @@ export default async function AdminPage({
               <Hammer className="h-4 w-4" />
               Jelenlegi projekt
             </Link>
+            <Link
+              href="/admin?tab=blog"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                tab === "blog"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Blog
+            </Link>
         </div>
       </div>
 
@@ -249,9 +263,19 @@ export default async function AdminPage({
             </h2>
             <p className="mt-1 mb-6 text-sm text-zinc-500">
               Egyszerre csak egy projekt jelenik meg a főoldalon, a „Kiemelt
-              alkotások" blokk alatt. A mentés felülírja a korábbit.
+              alkotások&rdquo; blokk alatt. A mentés felülírja a korábbit.
             </p>
             <AdminCurrentProject />
+          </>
+        ) : tab === "blog" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">Blog</h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              Cults3D tervezők modelljeit töltjük le, a Gemini AI magyarra
+              fordítja és SEO-kulcsszavakkal látja el őket, majd közzétesszük a
+              weboldal blogjában.
+            </p>
+            <AdminBlog />
           </>
         ) : (
           <>

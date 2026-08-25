@@ -56,6 +56,7 @@ export default function ReferralPromo({ minClicks }: { minClicks: number }) {
     return null;
   }, []);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const code = getOwnerCode();
     if (code) {
@@ -65,6 +66,7 @@ export default function ReferralPromo({ minClicks }: { minClicks: number }) {
       void loadStatus(code);
     }
   }, [loadStatus]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Polling: amíg nincs feloldva, rendszeresen frissítjük a kattintásokat.
   useEffect(() => {
