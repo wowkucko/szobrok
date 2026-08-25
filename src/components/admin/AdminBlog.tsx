@@ -59,6 +59,11 @@ export default function AdminBlog() {
   const [missingImages, setMissingImages] = useState(0);
   const [retranslating, setRetranslating] = useState(false);
   const [imageFixing, setImageFixing] = useState(false);
+  const [jobs, setJobs] = useState<{
+    translating: boolean;
+    imageFixing: boolean;
+    scheduled: string;
+  }>({ translating: false, imageFixing: false, scheduled: "" });
   const [newUsername, setNewUsername] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,14 +84,25 @@ export default function AdminBlog() {
     setLog(d.log ?? []);
   }, []);
 
+  const loadJobs = useCallback(async () => {
+    const j = await fetch("/api/admin/blog/jobs", { cache: "no-store" })
+      .then((r) => r.json())
+      .catch(() => ({ translating: false, imageFixing: false, scheduled: "" }));
+    setJobs(j);
+  }, []);
+
   const logOpen = showLog || retranslating || imageFixing || polling;
   useEffect(() => {
     if (!logOpen) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLog();
-    const t = setInterval(loadLog, 2500);
+    loadJobs();
+    const t = setInterval(() => {
+      loadLog();
+      loadJobs();
+    }, 2500);
     return () => clearInterval(t);
-  }, [logOpen, loadLog, retranslating, imageFixing, polling]);
+  }, [logOpen, loadLog, loadJobs, retranslating, imageFixing, polling]);
 
   const loadSources = useCallback(async () => {
     const s = await fetch("/api/admin/blog/sources").then((r) => r.json());
@@ -111,7 +127,8 @@ export default function AdminBlog() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAll();
-  }, [loadAll]);
+    loadJobs();
+  }, [loadAll, loadJobs]);
 
   useEffect(() => {
     if (!polling) return;
@@ -299,6 +316,34 @@ export default function AdminBlog() {
           {error}
         </div>
       )}
+
+      {/* Futó és ütemezett folyamatok */}
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+        <h3 className="text-sm font-semibold text-zinc-200">Futó és ütemezett folyamatok</h3>
+        <div className="mt-3 space-y-2 text-sm">
+          <p className="text-xs uppercase tracking-wide text-zinc-500">Jelenleg fut</p>
+          {sources
+            .filter((s) => s.syncStatus === "syncing" || s.syncStatus === "queued")
+            .map((s) => (
+              <p key={s.username} className="text-amber-300">
+                Szinkron: {s.username}
+                {s.syncTotal > 0 ? ` (${s.syncProgress}/${s.syncTotal})` : ""}
+              </p>
+            ))}
+          {jobs.translating && (
+            <p className="text-amber-300">Újrafordítás (Gemini) fut…</p>
+          )}
+          {jobs.imageFixing && (
+            <p className="text-sky-300">Képjavítás fut…</p>
+          )}
+          {sources.filter((s) => s.syncStatus === "syncing" || s.syncStatus === "queued").length === 0 &&
+            !jobs.translating &&
+            !jobs.imageFixing && <p className="text-zinc-500">Nincs futó folyamat.</p>}
+
+          <p className="pt-2 text-xs uppercase tracking-wide text-zinc-500">Ütemezett</p>
+          <p className="text-zinc-300">{jobs.scheduled || "—"}</p>
+        </div>
+      </section>
 
       {/* Források */}
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">

@@ -1843,8 +1843,10 @@ export function deleteBlogPostsBySource(username: string): number {
 }
 
 export function deleteBlogSource(username: string): void {
-  // Kaszkád: a forrással együtt a bejegyzései is törlődnek.
-  deleteBlogPostsBySource(username);
+  // A forrás (szinkron-beállítás) törlése – a már letöltött bejegyzések
+  // MEGMARADNAK, így a forrás újbóli hozzáadásakor csak az új (még nem
+  // letöltött) modellek szinkronizálódnak le újra (ld. getBlogPostByCultsId
+  // dedup a syncSource-ben). Egyedi bejegyzés törlése továbbra is külön lehetséges.
   getDb().prepare("DELETE FROM blog_sources WHERE username = ?").run(username);
 }
 

@@ -556,3 +556,18 @@ export async function fixBlogImages(
     imageFixRunning = false;
   }
 }
+
+/** A jelenleg futó (nem szinkron) háttérfolyamatok állapota a panelnek. */
+export function getJobStatus(): {
+  translating: boolean;
+  imageFixing: boolean;
+  scheduled: string;
+} {
+  return {
+    translating: translateRunning,
+    imageFixing: imageFixRunning,
+    scheduled:
+      process.env.CRON_BLOG_SYNC_SCHEDULE ||
+      "Napi automatikus szinkron + fordítás (szerver cron)",
+  };
+}
