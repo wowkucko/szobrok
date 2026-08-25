@@ -79,14 +79,14 @@ export default function AdminBlog() {
     setLog(d.log ?? []);
   }, []);
 
-  const logOpen = showLog || retranslating || polling;
+  const logOpen = showLog || retranslating || imageFixing || polling;
   useEffect(() => {
     if (!logOpen) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadLog();
     const t = setInterval(loadLog, 2500);
     return () => clearInterval(t);
-  }, [logOpen, loadLog, retranslating, polling]);
+  }, [logOpen, loadLog, retranslating, imageFixing, polling]);
 
   const loadSources = useCallback(async () => {
     const s = await fetch("/api/admin/blog/sources").then((r) => r.json());

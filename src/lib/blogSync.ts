@@ -431,10 +431,28 @@ export async function translateUntranslated(
 }
 
 /**
- * Hiányzó képek pótlása meglévő bejegyzéseknél. A Cults3D-ről újra lekéri az
- * adott forrás összes modelljét, és ahol a bejegyzésnek nincs képe, megpróbálja
- * letölteni a (most már illustrations-ből is pótolt) képet. Háttérben fut.
+  * Hiányzó képek pótlása meglévő bejegyzéseknél. A bejegyzések saját forrása
+ * (source) alapján lekéri a Cults3D modelleket, és ahol a bejegyzésnek nincs
+ * képe, megpróbálja letölteni a (illustrations-ből is pótolt) képet, végső
+ * esetben a modell oldaláról is. Háttérben fut.
  */
+async function scrapeCultsImageUrl(slug: string): Promise<string | null> {
+  try {
+    const html = await fetch(`https://cults3d.com/en/design/${slug}`, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+        Accept: "text/html",
+      },
+    }).then((r) => (r.ok ? r.text() : ""));
+    if (!html) return null;
+    const m = html.match(/https:\/\/images\.cults3d\.com\/[^"')>\s]+\.(?:jpe?g|png|webp)/i);
+    return m ? m[0] : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fixBlogImages(
   opts: { apiUser?: string; apiKey?: string } = {}
 ): Promise<{ fixed: number; failed: number }> {
@@ -450,28 +468,45 @@ export async function fixBlogImages(
       logBlog("error", "Képjavítás: hiányzik a CULTS3D_USERNAME vagy CULTS3D_API_KEY.");
       return { fixed: 0, failed: 0 };
     }
-    const sources = listBlogSources();
+    // A forrásokat a bejegyzések saját source mezőjéből gyűjtjük (ne csak a
+    // blog_sources táblából), hogy akkor se maradjanak ki tételek, ha a forrás
+    // nincs regisztrálva a blog_sources-ben.
+    const allMissing = listBlogPosts(1_000_000, 0, false).posts.filter(
+      (p) => !p.images || p.images.length === 0
+    );
+    const bySource = new Map<string, typeof allMissing>();
+    for (const p of allMissing) {
+      const arr = bySource.get(p.source) ?? [];
+      arr.push(p);
+      bySource.set(p.source, arr);
+    }
+    const before = countPostsMissingImages();
+    logBlog("info", `Képjavítás indítása: ${before} kép nélküli bejegyzés (${bySource.size} forrás).`);
     let fixed = 0;
     let failed = 0;
-    const before = countPostsMissingImages();
-    for (const src of sources) {
+    for (const [source, posts] of bySource) {
       let creations;
       try {
-        creations = await getCultsUserCreations(src.username, { apiUser, apiKey, maxPages: 1000 });
+        creations = await getCultsUserCreations(source, { apiUser, apiKey, maxPages: 1000 });
       } catch (e) {
-        logBlog("error", `${src.username}: képjavítás – Cults3D lekérés sikertelen: ${String(e)}`);
+        logBlog("error", `${source}: képjavítás – Cults3D lekérés sikertelen: ${String(e)}`);
+        failed += posts.length;
         continue;
       }
       const imageBySlug = new Map<string, string>();
       for (const c of creations) if (c.image) imageBySlug.set(c.slug, c.image);
-      const posts = listBlogPosts(1_000_000, 0, false).posts.filter(
-        (p) => p.source === src.username && (!p.images || p.images.length === 0)
-      );
       let srcFixed = 0;
+      let srcFailed = 0;
       for (const p of posts) {
-        const imgUrl = imageBySlug.get(p.cultsId);
+        let imgUrl: string | null | undefined = imageBySlug.get(p.cultsId);
         if (!imgUrl) {
+          // Végső próba: a modell oldaláról kiszedni a képet.
+          imgUrl = await scrapeCultsImageUrl(p.cultsId);
+        }
+        if (!imgUrl) {
+          logBlog("warn", `${p.cultsId}: kép nem található a Cults3D-ben (forrás: ${source}).`);
           failed++;
+          srcFailed++;
           continue;
         }
         const img = await downloadImage(imgUrl);
@@ -480,12 +515,15 @@ export async function fixBlogImages(
           fixed++;
           srcFixed++;
         } else {
+          logBlog("warn", `${p.cultsId}: a kép letöltése sikertelen (${imgUrl}).`);
           failed++;
+          srcFailed++;
         }
       }
-      if (posts.length > 0) {
-        logBlog("info", `${src.username}: képjavítás — ${srcFixed} kép pótolva, ${posts.length - srcFixed} sikertelen.`);
-      }
+      logBlog(
+        "info",
+        `${source}: képjavítás — ${srcFixed} kép pótolva, ${srcFailed} sikertelen (${posts.length} összesen).`
+      );
     }
     const after = countPostsMissingImages();
     logBlog(
