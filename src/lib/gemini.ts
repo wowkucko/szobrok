@@ -80,3 +80,82 @@ Válaszolj KIZÁRÓLAG egy strict JSON objektummal, semmi mással:
     description: parsed.description || input.description || input.title,
   };
 }
+
+/**
+ * Több bejegyzés egyetlen Gemini-hívásban (batch) — drasztikusan csökkenti a
+ * kérések számát, így a napi ingyenes kvóta sokkal kevesebb modellt érint.
+ * Ugyanannyi elemet ad vissza, mint az input (sorrendben); ha valamelyiknél
+ * üres a válasz, az eredeti EN szöveggel tér vissza.
+ */
+export async function translateBlogPosts(
+  inputs: TranslateInput[],
+  apiKey: string
+): Promise<TranslatedPost[]> {
+  if (!apiKey || inputs.length === 0) {
+    return inputs.map((i) => ({ title: i.title, excerpt: "", description: i.description }));
+  }
+
+  const keywordList =
+    inputs[0].keywords && inputs[0].keywords.length
+      ? inputs[0].keywords.join(", ")
+      : "(nincs megadva kulcsszó)";
+
+  const listText = inputs
+    .map(
+      (it, idx) =>
+        `${idx + 1}. Eredeti cím (EN): ${it.title}\n   Eredeti leírás (EN): ${
+          it.description || "(üres)"
+        }`
+    )
+    .join("\n\n");
+
+  const prompt = `Te egy magyar nyelvű, 3D nyomtatott festett szobrokat árusító webáruház (festettszobrok.com) blog szerkesztője vagy.
+A feladatod: az alábbi 3D nyomtatott modellek (Cults3D) angol címét és leírását fordítsd le természetes, olvasmányos magyar nyelvre, és írj belőlük vonzó blogbejegyzéseket.
+A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns).
+Minden bejegyzés legyen 2-4 rövid bekezdés, barátságos hangvételű. Ne emlékeztess kötelezően a "Cults3D" szóra.
+
+Kulcsszavak: ${keywordList}
+
+Lista:
+${listText}
+
+Válaszolj KIZÁRÓLAG egy strict JSON tömbbel, pontosan ${inputs.length} elemmel, az eredeti sorrendben:
+[
+  { "title": "magyar cím, max 80 karakter", "excerpt": "egy frázis, max 160 karakter", "description": "teljes magyar blogszöveg, \\n\\n választja el a bekezdéseket" }
+]`;
+
+  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Gemini válasz ${res.status}: ${await res.text().catch(() => "")}`);
+  }
+
+  const json = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("Gemini üres választ adott.");
+
+  const parsed = extractJson(text);
+  const arr = Array.isArray(parsed) ? parsed : [parsed];
+
+  return inputs.map((it, idx) => {
+    const p = (arr[idx] ?? {}) as {
+      title?: string;
+      excerpt?: string;
+      description?: string;
+    };
+    return {
+      title: (p.title || it.title).slice(0, 120),
+      excerpt: (p.excerpt || "").slice(0, 200),
+      description: p.description || it.description || it.title,
+    };
+  });
+}

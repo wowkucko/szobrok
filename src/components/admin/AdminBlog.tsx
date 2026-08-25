@@ -48,6 +48,7 @@ export default function AdminBlog() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [postTotal, setPostTotal] = useState(0);
   const [untranslated, setUntranslated] = useState(0);
+  const [retranslating, setRetranslating] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -163,10 +164,45 @@ export default function AdminBlog() {
     await loadAll();
   }
 
-  function handleRetranslate() {
-    setStatus("Újrafordítás elindítva a háttérben…");
-    fetch("/api/admin/blog/translate", { method: "POST" }).catch(() => {});
-    setTimeout(loadAll, 1500);
+  async function handleRetranslate() {
+    if (retranslating) return;
+    setRetranslating(true);
+    setStatus("Újrafordítás elindítva…");
+    await fetch("/api/admin/blog/translate", { method: "POST" }).catch(() => {});
+    // Poll: amíg csökken a lefordítatlan bejegyzések száma, jelzünk állapotot.
+    let prev = -1;
+    let stable = 0;
+    for (let i = 0; i < 720; i++) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const cur = await fetch("/api/admin/blog/posts?limit=1", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d: { untranslated?: number }) => d.untranslated ?? 0)
+        .catch(() => prev);
+      await loadAll();
+      if (cur === 0) {
+        setStatus("Újrafordítás kész: minden bejegyzés lefordítva.");
+        setRetranslating(false);
+        return;
+      }
+      if (cur >= prev) {
+        stable++;
+        if (stable >= 3) {
+          setStatus(
+            cur > 0
+              ? `Újrafordítás megállt: ${cur} bejegyzés maradt lefordítatlan (Gemini-kulcs hiányzik, kvóta túllépve/429, vagy egyéb fordítási hiba?).`
+              : "Újrafordítás kész."
+          );
+          setRetranslating(false);
+          return;
+        }
+      } else {
+        stable = 0;
+      }
+      prev = cur;
+      setStatus(`Újrafordítás folyamatban… még ${cur} lefordítatlan.`);
+    }
+    setRetranslating(false);
+    setStatus("Újrafordítás: a maximális várakozási idő eltelt.");
   }
 
   function handleStopSource(username: string) {
@@ -352,10 +388,11 @@ export default function AdminBlog() {
           {untranslated > 0 && (
             <button
               onClick={handleRetranslate}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-700/50 px-3 text-xs text-amber-300 hover:bg-amber-700/10"
+              disabled={retranslating}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-700/50 px-3 text-xs text-amber-300 hover:bg-amber-700/10 disabled:opacity-50"
             >
               <Languages className="h-3.5 w-3.5" />
-              {untranslated} nem fordított — újrafordítás
+              {retranslating ? "Újrafordítás…" : `${untranslated} nem fordított — újrafordítás`}
             </button>
           )}
         </div>

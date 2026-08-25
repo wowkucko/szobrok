@@ -9,6 +9,7 @@ import {
   Inbox,
   Plus,
   Rss,
+  Settings,
   Ticket,
 } from "lucide-react";
 import {
@@ -27,6 +28,7 @@ import AdminMessages from "@/components/admin/AdminMessages";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminCurrentProject from "@/components/admin/AdminCurrentProject";
 import AdminBlog from "@/components/admin/AdminBlog";
+import AdminEnv from "@/components/admin/AdminEnv";
 import { auth, signOut } from "@/auth";
 
 export const metadata: Metadata = {
@@ -48,7 +50,8 @@ export default async function AdminPage({
     tabRaw === "messages" ||
     tabRaw === "coupons" ||
     tabRaw === "current" ||
-    tabRaw === "blog"
+    tabRaw === "blog" ||
+    tabRaw === "env"
       ? tabRaw
       : "products";
 
@@ -228,6 +231,17 @@ export default async function AdminPage({
               <FileText className="h-4 w-4" />
               Blog
             </Link>
+            <Link
+              href="/admin?tab=env"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                tab === "env"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Környezet
+            </Link>
         </div>
       </div>
 
@@ -276,6 +290,16 @@ export default async function AdminPage({
               weboldal blogjában.
             </p>
             <AdminBlog />
+          </>
+        ) : tab === "env" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">Környezeti változók</h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              A szerver <code className="text-zinc-300">.env.local</code> fájljának
+              szerkesztése (kulcsok, jelszavak, API tokenek) — közvetlenül az
+              admin felületről.
+            </p>
+            <AdminEnv />
           </>
         ) : (
           <>

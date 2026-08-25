@@ -20,7 +20,7 @@ import {
   updateBlogPostTranslation,
 } from "@/lib/db";
 import { getCultsUserCreations } from "@/lib/cults";
-import { translateBlogPost } from "@/lib/gemini";
+import { translateBlogPosts, type TranslatedPost } from "@/lib/gemini";
 import { optimizeImage } from "@/lib/optimizeImage";
 
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
@@ -36,6 +36,8 @@ const cancelled = new Set<string>();
 export function cancelSync(username: string): void {
   cancelled.add(username);
 }
+
+type Creation = NonNullable<Awaited<ReturnType<typeof getCultsUserCreations>>[number]>;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -65,37 +67,45 @@ async function downloadImage(imageUrl: string): Promise<string | null> {
   }
 }
 
-/** Gemini fordítás újrapróbálással (429 / hálózati hiba esetén backoff). */
-async function translateWithRetry(
-  input: { title: string; description: string; keywords: string[] },
+/** Kötegelő Gemini fordítás (batch) — egy hívás több bejegyzésre.
+ *  Újrapróbálás 429 / hálózati hiba esetén backoffal. */
+async function translateBatchWithRetry(
+  inputs: { title: string; description: string; keywords: string[] }[],
   geminiKey: string | undefined
-): Promise<{ translated: { title: string; excerpt: string; description: string }; ok: boolean }> {
-  const fallback = {
-    title: input.title,
-    excerpt: "",
-    description: input.description,
-  };
-  if (!geminiKey || !input.description) return { translated: fallback, ok: false };
-
+): Promise<{ items: { translated: TranslatedPost; ok: boolean }[] }> {
+  if (!geminiKey || inputs.length === 0) {
+    return {
+      items: inputs.map((i) => ({
+        translated: { title: i.title, excerpt: "", description: i.description },
+        ok: false,
+      })),
+    };
+  }
   let lastErr: unknown;
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const translated = await translateBlogPost(input, geminiKey);
-      return { translated, ok: true };
+      const translated = await translateBlogPosts(inputs, geminiKey);
+      return { items: translated.map((t) => ({ translated: t, ok: true })) };
     } catch (e) {
       lastErr = e;
       const msg = String(e);
-      // 429 (rate limit) vagy hálózati hiba -> várj és próbáld újra
-      if (attempt < 3 && (/429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg))) {
+      if (attempt < 3 && /429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg)) {
         await sleep(1000 * Math.pow(2, attempt));
         continue;
       }
       break;
     }
   }
-  console.error(`[blogSync] fordítás sikertelen (${input.title}):`, lastErr);
-  return { translated: fallback, ok: false };
+  console.error(`[blogSync] kötegelt fordítás sikertelen:`, lastErr);
+  return {
+    items: inputs.map((i) => ({
+      translated: { title: i.title, excerpt: "", description: i.description },
+      ok: false,
+    })),
+  };
 }
+
+const BATCH_SIZE = 8; // bejegyzés / Gemini-hívás (kvóta-takarékos)
 
 export interface SyncResult {
   username: string;
@@ -153,9 +163,56 @@ export async function syncSource(
     let imported = 0;
     let skipped = 0;
 
+    // Kötegelő fordítás: az új bejegyzéseket BATCH_SIZE-ként fordítjuk egy
+    // Gemini-hívásban, hogy a napi ingyenes kvótát ne lépjük túl feleslegesen.
+    const buffer: Creation[] = [];
+
+    const flushBuffer = async (): Promise<boolean> => {
+      if (buffer.length === 0) return false;
+      const inputs = buffer.map((b) => ({
+        title: b.title,
+        description: b.description,
+        keywords,
+      }));
+      const { items } = await translateBatchWithRetry(inputs, geminiKey);
+      for (let i = 0; i < buffer.length; i++) {
+        if (cancelled.has(username)) {
+          cancelled.delete(username);
+          updateBlogSourceSync(username, { status: "cancelled", error: null });
+          touchBlogSource(username);
+          buffer.length = 0;
+          return true;
+        }
+        const b = buffer[i];
+        const t = items[i];
+        const image = await downloadImage(b.image);
+        insertBlogPost({
+          source: username,
+          cultsId: b.slug,
+          slug: uniqueSlug(t.translated.title || b.title),
+          title: t.translated.title,
+          excerpt: t.translated.excerpt,
+          description: t.translated.description,
+          images: image ? [image] : [],
+          sourceUrl: b.url,
+          publishedAt: b.publishedAt,
+          translated: t.ok,
+        });
+        imported++;
+        updateBlogSourceSync(username, { progress: base + imported });
+        if (imported >= limit) {
+          updateBlogSourceSync(username, { status: "done", progress: base + imported });
+          touchBlogSource(username);
+          buffer.length = 0;
+          return true;
+        }
+        await sleep(batchDelay);
+      }
+      buffer.length = 0;
+      return false;
+    };
+
     for (const c of creations) {
-      // Leállítási kérés közben: azonnal abbahagyjuk. A már beillesztett
-      // bejegyzések megmaradnak, az állapot „cancelled" lesz.
       if (cancelled.has(username)) {
         cancelled.delete(username);
         updateBlogSourceSync(username, { status: "cancelled", error: null });
@@ -166,37 +223,20 @@ export async function syncSource(
         skipped++;
         continue;
       }
-
-      const { translated, ok } = await translateWithRetry(
-        { title: c.title, description: c.description, keywords },
-        geminiKey
-      );
-      const image = await downloadImage(c.image);
-
-      insertBlogPost({
-        source: username,
-        cultsId: c.slug,
-        slug: uniqueSlug(translated.title || c.title),
-        title: translated.title,
-        excerpt: translated.excerpt,
-        description: translated.description,
-        images: image ? [image] : [],
-        sourceUrl: c.url,
-        publishedAt: c.publishedAt,
-        translated: ok,
-      });
-
-      imported++;
-      updateBlogSourceSync(username, { progress: base + imported });
-      if (imported >= limit) {
-        // Többet nem töltünk ebben a futásban; a maradék a következő szinkronnal.
-        const remaining = Math.max(0, creations.length - (skipped + imported));
+      buffer.push(c);
+      // Maximális új bejegyzés: vágjuk meg a buffert, és fejezzük be a futást.
+      if (limit > 0 && buffer.length >= limit - imported) {
+        buffer.length = Math.max(0, limit - imported);
+        await flushBuffer();
         updateBlogSourceSync(username, { status: "done", progress: base + imported });
         touchBlogSource(username);
-        return { username, imported, skipped, remaining };
+        return { username, imported, skipped, remaining: 0 };
       }
-      await sleep(batchDelay);
+      if (buffer.length >= BATCH_SIZE) {
+        await flushBuffer();
+      }
     }
+    await flushBuffer();
 
     updateBlogSourceSync(username, { status: "done", progress: base + imported });
     touchBlogSource(username);
@@ -223,7 +263,7 @@ export async function syncAllSources(opts: SyncOptions = {}): Promise<SyncResult
 
 /**
  * A még angolul maradt (fordítási hiba miatt) bejegyzések újrafordítása.
- * Háttérben fut, állapotot a DB-ben nem jelez (rövid műveletnek szánva).
+ * Kötegelten, háttérben fut — a Gemini-kvótát kímélve.
  */
 export async function translateUntranslated(
   opts: { geminiKey?: string; batchDelayMs?: number } = {}
@@ -234,20 +274,21 @@ export async function translateUntranslated(
   let translated = 0;
   let failed = 0;
 
-  for (const p of posts) {
-    const { translated: t, ok } = await translateWithRetry(
-      { title: p.title, description: p.description, keywords: [] },
-      geminiKey
-    );
-    if (ok) {
-      updateBlogPostTranslation(p.id, {
-        title: t.title,
-        excerpt: t.excerpt,
-        description: t.description,
-      });
-      translated++;
-    } else {
-      failed++;
+  for (let i = 0; i < posts.length; i += BATCH_SIZE) {
+    const slice = posts.slice(i, i + BATCH_SIZE);
+    const inputs = slice.map((p) => ({
+      title: p.title,
+      description: p.description,
+      keywords: [],
+    }));
+    const { items } = await translateBatchWithRetry(inputs, geminiKey);
+    for (let j = 0; j < slice.length; j++) {
+      if (items[j].ok) {
+        updateBlogPostTranslation(slice[j].id, items[j].translated);
+        translated++;
+      } else {
+        failed++;
+      }
     }
     await sleep(batchDelay);
   }

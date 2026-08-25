@@ -51,7 +51,7 @@ export default function BlogCard({
                 </div>
               )}
               <Image
-                src={`/api/files/${cover}`}
+                src={cover}
                 alt={post.title}
                 fill
                 priority={priority}
