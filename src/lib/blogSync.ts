@@ -38,6 +38,9 @@ export function cancelSync(username: string): void {
   cancelled.add(username);
 }
 
+/** Egyszerre csak egy újrafordítás futhat (a retry-szünetek órákig is tarthatnak). */
+let translateRunning = false;
+
 type Creation = NonNullable<Awaited<ReturnType<typeof getCultsUserCreations>>[number]>;
 
 /** Gemini hibából kinyerhető emberi olvasmányú leírás (kvóta/retryDelay). */
@@ -69,6 +72,22 @@ function describeGeminiError(e: unknown): string {
     }
   }
   return msg;
+}
+
+/** Újrapróbálási szünetek (exponenciálisan növekvő): 10p, 30p, 2ó, 4ó, 6ó, 8ó,
+ *  majd újra elölről (ciklusonként ismétlődik). */
+const RETRY_SCHEDULE_MS = [
+  10 * 60_000,
+  30 * 60_000,
+  2 * 3600_000,
+  4 * 3600_000,
+  6 * 3600_000,
+  8 * 3600_000,
+];
+
+function formatDuration(ms: number): string {
+  if (ms < 3600_000) return `${Math.max(1, Math.round(ms / 60_000))} perc`;
+  return `${Math.round(ms / 3600_000)} óra`;
 }
 
 function sleep(ms: number) {
@@ -114,30 +133,39 @@ async function translateBatchWithRetry(
       })),
     };
   }
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      const translated = await translateBlogPosts(inputs, geminiKey);
-      return { items: translated.map((t) => ({ translated: t, ok: true })) };
-    } catch (e) {
-      lastErr = e;
-      const msg = String(e);
-      if (attempt < 3 && /429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg)) {
-        const delay = 1000 * Math.pow(2, attempt);
-        logBlog("warn", `Gemini hiba (${attempt + 1}/4), újrapróbálás ${delay} ms múlva: ${describeGeminiError(e)}`);
-        await sleep(delay);
-        continue;
-      }
-      break;
-    }
-  }
-  logBlog("error", `Kötegelő fordítás végleg sikertelen: ${describeGeminiError(lastErr)}`);
-  return {
+  const failedItems = (): { items: { translated: TranslatedPost; ok: boolean }[] } => ({
     items: inputs.map((i) => ({
       translated: { title: i.title, excerpt: "", description: i.description },
       ok: false,
     })),
-  };
+  });
+
+  let attempt = 0;
+  for (;;) {
+    try {
+      const translated = await translateBlogPosts(inputs, geminiKey);
+      return { items: translated.map((t) => ({ translated: t, ok: true })) };
+    } catch (e) {
+      const msg = String(e);
+      if (!/429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg)) {
+        logBlog(
+          "error",
+          `Kötegelő fordítás végleg sikertelen (nem újrapróbálható): ${describeGeminiError(e)}`
+        );
+        break;
+      }
+      const step = (attempt % RETRY_SCHEDULE_MS.length) + 1;
+      const cycle = Math.floor(attempt / RETRY_SCHEDULE_MS.length) + 1;
+      const delay = RETRY_SCHEDULE_MS[attempt % RETRY_SCHEDULE_MS.length];
+      logBlog(
+        "warn",
+        `Gemini hiba (${step}. lépés / ${cycle}. ciklus), újrapróbálás ${formatDuration(delay)} múlva: ${describeGeminiError(e)}`
+      );
+      await sleep(delay);
+      attempt++;
+    }
+  }
+  return failedItems();
 }
 
 const BATCH_SIZE = 8; // bejegyzés / Gemini-hívás (kvóta-takarékos)
@@ -312,26 +340,32 @@ export async function syncAllSources(opts: SyncOptions = {}): Promise<SyncResult
 export async function translateUntranslated(
   opts: { geminiKey?: string; batchDelayMs?: number } = {}
 ): Promise<{ total: number; translated: number; failed: number }> {
-  const geminiKey = opts.geminiKey ?? process.env.GEMINI_API_KEY;
-  const batchDelay = opts.batchDelayMs && opts.batchDelayMs > 0 ? opts.batchDelayMs : 400;
-  const posts = listUntranslatedPosts();
-  let translated = 0;
-  let failed = 0;
-
-  const total = posts.length;
-  const batches = Math.ceil(total / BATCH_SIZE);
-  if (total === 0) {
-    logBlog("info", "Újrafordítás: nincs lefordítatlan bejegyzés.");
+  if (translateRunning) {
+    logBlog("warn", "Újrafordítás már fut – az új kérés figyelmen kívül hagyva.");
     return { total: 0, translated: 0, failed: 0 };
   }
-  if (!geminiKey) {
-    logBlog("warn", "Újrafordítás: GEMINI_API_KEY hiányzik – minden bejegyzés angolul marad.");
-    return { total, translated: 0, failed: total };
-  }
-  logBlog(
-    "info",
-    `Újrafordítás indítása: ${total} lefordítatlan bejegyzés, ${batches} köteg (${BATCH_SIZE}/Gemini-hívás).`
-  );
+  translateRunning = true;
+  try {
+    const geminiKey = opts.geminiKey ?? process.env.GEMINI_API_KEY;
+    const batchDelay = opts.batchDelayMs && opts.batchDelayMs > 0 ? opts.batchDelayMs : 400;
+    const posts = listUntranslatedPosts();
+    let translated = 0;
+    let failed = 0;
+
+    const total = posts.length;
+    const batches = Math.ceil(total / BATCH_SIZE);
+    if (total === 0) {
+      logBlog("info", "Újrafordítás: nincs lefordítatlan bejegyzés.");
+      return { total: 0, translated: 0, failed: 0 };
+    }
+    if (!geminiKey) {
+      logBlog("warn", "Újrafordítás: GEMINI_API_KEY hiányzik – minden bejegyzés angolul marad.");
+      return { total, translated: 0, failed: total };
+    }
+    logBlog(
+      "info",
+      `Újrafordítás indítása: ${total} lefordítatlan bejegyzés, ${batches} köteg (${BATCH_SIZE}/Gemini-hívás).`
+    );
 
   for (let i = 0; i < posts.length; i += BATCH_SIZE) {
     const slice = posts.slice(i, i + BATCH_SIZE);
@@ -364,4 +398,7 @@ export async function translateUntranslated(
     `Újrafordítás befejezve: ${translated} lefordítva, ${failed} sikertelen (${total} összesen).`
   );
   return { total, translated, failed };
+  } finally {
+    translateRunning = false;
+  }
 }
