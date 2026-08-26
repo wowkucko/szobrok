@@ -7,6 +7,7 @@ import {
   Languages,
   Plus,
   RefreshCw,
+  Tag,
   Trash2,
 } from "lucide-react";
 
@@ -295,6 +296,19 @@ export default function AdminBlog() {
     setStatus("Képjavítás: a maximális várakozási idő eltelt.");
   }
 
+  async function handleBackfillTags() {
+    setStatus("Címkék újragenerálása a bejegyzések címéből…");
+    const r = await fetch("/api/admin/blog/tags/backfill", { method: "POST" })
+      .then((res) => res.json())
+      .catch(() => null);
+    await loadAll();
+    setStatus(
+      r && typeof r.updated === "number"
+        ? `Címkék készen: ${r.updated} bejegyzés címkézve.`
+        : "Címkék újragenerálása sikertelen."
+    );
+  }
+
   function handleStopSource(username: string) {
     setStatus(`„${username}" szinkronjának leállítása…`);
     fetch(
@@ -543,6 +557,15 @@ export default function AdminBlog() {
                 {imageFixing ? "Képjavítás…" : `${missingImages} kép nélkül — képek javítása`}
               </button>
             )}
+            <button
+              onClick={handleBackfillTags}
+              disabled={imageFixing || retranslating}
+              title="A bejegyzések címéből kinyeri a legnépszerűbb címkéket (a blog listázó fenti sávjához)."
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-zinc-700 px-3 text-xs text-zinc-300 hover:bg-zinc-800/60 disabled:opacity-50"
+            >
+              <Tag className="h-3.5 w-3.5" />
+              Címkék újragenerálása
+            </button>
           </div>
         </div>
         <p className="mt-1 text-xs text-zinc-500">

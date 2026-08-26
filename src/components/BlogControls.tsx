@@ -14,6 +14,7 @@ export default function BlogControls({
   const searchParams = useSearchParams();
   const urlQ = searchParams.get("q") ?? "";
   const urlPer = Number(searchParams.get("perPage")) || DEFAULT_PER;
+  const urlTag = searchParams.get("tag") ?? "";
 
   const [q, setQ] = useState(urlQ);
   const [per, setPer] = useState(urlPer);
@@ -28,6 +29,7 @@ export default function BlogControls({
   const push = (nextQ: string, nextPer: number) => {
     const sp = new URLSearchParams();
     if (nextQ.trim()) sp.set("q", nextQ.trim());
+    if (urlTag) sp.set("tag", urlTag);
     if (nextPer !== DEFAULT_PER) sp.set("perPage", String(nextPer));
     sp.set("page", "1");
     router.push(`/blog?${sp.toString()}`);

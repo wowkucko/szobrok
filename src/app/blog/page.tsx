@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Pagination from "@/components/Pagination";
 import BlogControls from "@/components/BlogControls";
-import { listBlogPosts } from "@/lib/db";
+import { listBlogPosts, listTopTags } from "@/lib/db";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 const PER_PAGE_OPTIONS = [9, 12, 18, 24];
@@ -37,21 +37,33 @@ export default async function BlogPage({
   const params = await searchParams;
   const requestedPage = Math.max(1, Number(params.page) || 1);
   const search = typeof params.q === "string" ? params.q.trim() : "";
+  const tag = typeof params.tag === "string" ? params.tag.trim() : "";
   const pageSize = PER_PAGE_OPTIONS.includes(Number(params.perPage))
     ? Number(params.perPage)
     : DEFAULT_PER;
 
-  const first = listBlogPosts(pageSize, (requestedPage - 1) * pageSize, true, search || undefined);
+  const first = listBlogPosts(pageSize, (requestedPage - 1) * pageSize, true, search || undefined, tag || undefined);
   const pageCount = Math.max(1, Math.ceil(first.total / pageSize));
   const safePage = Math.min(requestedPage, pageCount);
   const { total, posts } =
     safePage === requestedPage
       ? first
-      : listBlogPosts(pageSize, (safePage - 1) * pageSize, true, search || undefined);
+      : listBlogPosts(pageSize, (safePage - 1) * pageSize, true, search || undefined, tag || undefined);
+
+  const topTags = listTopTags(24);
 
   const buildHref = (p: number) => {
     const sp = new URLSearchParams();
     if (p > 1) sp.set("page", String(p));
+    if (search) sp.set("q", search);
+    if (tag) sp.set("tag", tag);
+    if (pageSize !== DEFAULT_PER) sp.set("perPage", String(pageSize));
+    const s = sp.toString();
+    return s ? `/blog?${s}` : "/blog";
+  };
+  const tagHref = (t: string) => {
+    const sp = new URLSearchParams();
+    if (t) sp.set("tag", t);
     if (search) sp.set("q", search);
     if (pageSize !== DEFAULT_PER) sp.set("perPage", String(pageSize));
     const s = sp.toString();
@@ -101,6 +113,38 @@ export default async function BlogPage({
             <Suspense fallback={null}>
               <BlogControls perPageOptions={PER_PAGE_OPTIONS} />
             </Suspense>
+            {topTags.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-medium uppercase tracking-widest text-zinc-500">
+                  Legnépszerűbb címkék
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {tag && (
+                    <Link
+                      href={tagHref("")}
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-600/60 bg-amber-600/15 px-3 py-1 text-xs font-medium text-amber-300"
+                    >
+                      {tag} ✕
+                    </Link>
+                  )}
+                  {topTags.map(({ tag: t, count }) => (
+                    <Link
+                      key={t}
+                      href={tagHref(t)}
+                      className={
+                        "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors " +
+                        (t === tag
+                          ? "border-amber-600/60 bg-amber-600/15 text-amber-300"
+                          : "border-zinc-700 bg-zinc-900/60 text-zinc-300 hover:border-amber-600/60 hover:text-amber-300")
+                      }
+                    >
+                      {t}
+                      <span className="text-[10px] text-zinc-500">{count}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
             {search && total > 0 && (
               <p className="mt-3 text-sm text-zinc-500">
                 {total} találat a „{search}” kifejezésre.

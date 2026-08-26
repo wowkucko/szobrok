@@ -249,6 +249,14 @@ const BLOG_KEYWORDS_SCHEMA = `
   )
 `;
 
+const BLOG_POST_TAGS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS blog_post_tags (
+    post_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    PRIMARY KEY (post_id, tag)
+  )
+`;
+
 const UPSERT_FEED_SQL = `
   INSERT INTO feed_entries (
     product_id, feed_id, title, description, availability, condition, price,
@@ -378,6 +386,7 @@ function getDb(): DatabaseSync {
   db.exec(BLOG_SOURCES_SCHEMA);
   db.exec(BLOG_POSTS_SCHEMA);
   db.exec(BLOG_KEYWORDS_SCHEMA);
+  db.exec(BLOG_POST_TAGS_SCHEMA);
   // Blog táblák kiterjesztése a szinkron-állapot és a translated zászló oszlopokkal
   try {
     const sourceCols = db
@@ -1759,6 +1768,7 @@ export interface BlogPost {
   publishedAt: string;
   createdAt: string;
   translated: boolean;
+  tags: string[];
 }
 
 export interface BlogKeyword {
@@ -1878,7 +1888,8 @@ export function listBlogPosts(
   limit = 20,
   offset = 0,
   onlyTranslated = false,
-  search?: string
+  search?: string,
+  tag?: string
 ): { total: number; posts: BlogPost[] } {
   const db = getDb();
   const clauses: string[] = [];
@@ -1889,18 +1900,24 @@ export function listBlogPosts(
     const like = `%${search.trim()}%`;
     args.push(like, like, like);
   }
+  if (tag && tag.trim()) {
+    clauses.push("id IN (SELECT post_id FROM blog_post_tags WHERE tag = ?)");
+    args.push(tag.trim());
+  }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const total = (
     db.prepare(`SELECT COUNT(*) AS c FROM blog_posts ${where}`).get(...(args as [])) as { c: number }
   ).c;
   const rows = db
     .prepare(
-      `SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated,
+        (SELECT GROUP_CONCAT(tag) FROM blog_post_tags WHERE post_id = blog_posts.id) AS tags_csv
+       FROM blog_posts ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     )
     .all(...args, limit, offset) as {
     id: string; source: string; cults_id: string; slug: string; title: string;
     excerpt: string; description: string; images: string; source_url: string;
-    published_at: string; created_at: string; translated: number;
+    published_at: string; created_at: string; translated: number; tags_csv: string | null;
   }[];
   const posts = rows.map((r) => ({
     id: r.id, source: r.source, cultsId: r.cults_id, slug: r.slug, title: r.title,
@@ -1908,6 +1925,7 @@ export function listBlogPosts(
     images: safeJsonParse<string[]>(r.images, []),
     sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
     translated: r.translated === 1,
+    tags: r.tags_csv ? r.tags_csv.split(",") : [],
   }));
   return { total, posts };
 }
@@ -1922,6 +1940,92 @@ const STOPWORDS = new Set([
 function tokenize(text: string): string[] {
   return (text.toLowerCase().match(/[a-záéíóöőúüű0-9]+/g) ?? [])
     .filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+}
+
+// A címekben rendszeresek, de nem jellemzőek egy adott témára – kiszűrjük őket,
+// hogy a címkék között csak a megkülönböztető (pl. karakter-/témanevek) maradjanak.
+const GENERIC_TAGS = new Set([
+  // magyar
+  "szobor", "szobrok", "figura", "figurák", "nyomtatott", "nyomtatás", "kézzel",
+  "festett", "festés", "művészet", "művész", "gyűjtői", "gyűjtemény", "stúdió",
+  "műhely", "limitált", "kiadás", "alkotás", "modell", "modellek", "mintázat",
+  "részlet", "minőség", "prémium", "egyedi", "termék", "termékek", "vásárlás",
+  "áron", "akció", "kedvezmény", "blog", "bejegyzés", "magyar", "magyarul",
+  "világ", "történet", "ihlet", "ötlet", "ötletek", "kreatív", "3d",
+  // angol (a névmegőrzés miatt sok eredeti angol szó marad a címben)
+  "the", "and", "with", "from", "for", "print", "prints", "printed", "hand",
+  "painted", "painting", "art", "artist", "statue", "statues", "figure",
+  "figures", "model", "models", "custom", "collectible", "collectibles",
+  "collector", "design", "designer", "mini", "miniature", "scale", "fan",
+  "fans", "game", "games", "movie", "movies", "series", "edition", "limited",
+  "premium", "quality", "detail", "details", "studio", "inspiration", "idea",
+  "ideas", "diy", "make", "making", "tutorial", "review", "best", "top", "new",
+  "shop", "store", "buy",
+]);
+
+/** Címkék generálása egy bejegyzés címéből (helyi, ingyenes, nyelvfüggetlen tokenizálás). */
+export function generateTagsFromTitle(title: string, maxTags = 6): string[] {
+  if (!title) return [];
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const t of tokenize(title)) {
+    if (GENERIC_TAGS.has(t) || seen.has(t)) continue;
+    seen.add(t);
+    tags.push(t);
+    if (tags.length >= maxTags) break;
+  }
+  return tags;
+}
+
+/** Egy bejegyzés címkéinek felülírása (a post_id szinten tárolva). */
+export function setBlogPostTags(postId: string, tags: string[]): void {
+  const db = getDb();
+  const del = db.prepare("DELETE FROM blog_post_tags WHERE post_id = ?");
+  const ins = db.prepare("INSERT OR IGNORE INTO blog_post_tags (post_id, tag) VALUES (?, ?)");
+  try {
+    db.exec("BEGIN");
+    del.run(postId);
+    for (const t of tags) ins.run(postId, t);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/** Legnépszerűbb címkék a bejegyzések száma szerint (csökkenő sorrend). */
+export function listTopTags(limit = 24): { tag: string; count: number }[] {
+  return getDb()
+    .prepare(
+      "SELECT tag, COUNT(*) AS count FROM blog_post_tags GROUP BY tag ORDER BY count DESC, tag ASC LIMIT ?"
+    )
+    .all(limit) as { tag: string; count: number }[];
+}
+
+/** Összes meglévő bejegyzés címkéinek újragenerálása a címből (visszatöltés). */
+export function backfillBlogTags(): { updated: number } {
+  const db = getDb();
+  const rows = db.prepare("SELECT id, title FROM blog_posts").all() as {
+    id: string;
+    title: string;
+  }[];
+  const del = db.prepare("DELETE FROM blog_post_tags WHERE post_id = ?");
+  const ins = db.prepare("INSERT OR IGNORE INTO blog_post_tags (post_id, tag) VALUES (?, ?)");
+  let updated = 0;
+  try {
+    db.exec("BEGIN");
+    for (const r of rows) {
+      const tags = generateTagsFromTitle(r.title);
+      del.run(r.id);
+      for (const t of tags) ins.run(r.id, t);
+      updated++;
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return { updated };
 }
 
 /**
@@ -1954,12 +2058,12 @@ export function getRelatedPosts(slug: string, limit = 3): BlogPost[] {
 export function getBlogPostBySlug(slug: string): BlogPost | null {
   const r = getDb()
     .prepare(
-      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts WHERE slug = ?"
+      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated, (SELECT GROUP_CONCAT(tag) FROM blog_post_tags WHERE post_id = blog_posts.id) AS tags_csv FROM blog_posts WHERE slug = ?"
     )
     .get(slug) as
     | { id: string; source: string; cults_id: string; slug: string; title: string;
         excerpt: string; description: string; images: string; source_url: string;
-        published_at: string; created_at: string; translated: number; }
+        published_at: string; created_at: string; translated: number; tags_csv: string | null; }
     | undefined;
   if (!r) return null;
   return {
@@ -1968,6 +2072,7 @@ export function getBlogPostBySlug(slug: string): BlogPost | null {
     images: safeJsonParse<string[]>(r.images, []),
     sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
     translated: r.translated === 1,
+    tags: r.tags_csv ? r.tags_csv.split(",") : [],
   };
 }
 
@@ -1981,15 +2086,16 @@ export function getBlogPostByCultsId(cultsId: string): BlogPost | null {
   );
 }
 
-export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt">): { status: "inserted" | "exists" } {
+export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt" | "tags">): { status: "inserted" | "exists" } {
   const db = getDb();
   const exists = db.prepare("SELECT 1 FROM blog_posts WHERE cults_id = ?").get(input.cultsId);
   if (exists) return { status: "exists" };
+  const id = randomUUID();
   db.prepare(
     `INSERT INTO blog_posts (id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    randomUUID(),
+    id,
     input.source,
     input.cultsId,
     input.slug,
@@ -2002,6 +2108,7 @@ export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt">): { sta
     new Date().toISOString(),
     input.translated ? 1 : 0
   );
+  setBlogPostTags(id, generateTagsFromTitle(input.title));
   return { status: "inserted" };
 }
 
@@ -2020,12 +2127,12 @@ export function countBlogPostsBySource(username: string): number {
 export function listUntranslatedPosts(): BlogPost[] {
   const rows = getDb()
     .prepare(
-      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated FROM blog_posts WHERE translated = 0"
+      "SELECT id, source, cults_id, slug, title, excerpt, description, images, source_url, published_at, created_at, translated, (SELECT GROUP_CONCAT(tag) FROM blog_post_tags WHERE post_id = blog_posts.id) AS tags_csv FROM blog_posts WHERE translated = 0"
     )
     .all() as {
       id: string; source: string; cults_id: string; slug: string; title: string;
       excerpt: string; description: string; images: string; source_url: string;
-      published_at: string; created_at: string; translated: number;
+      published_at: string; created_at: string; translated: number; tags_csv: string | null;
     }[];
   return rows.map((r) => ({
     id: r.id, source: r.source, cultsId: r.cults_id, slug: r.slug, title: r.title,
@@ -2033,6 +2140,7 @@ export function listUntranslatedPosts(): BlogPost[] {
     images: safeJsonParse<string[]>(r.images, []),
     sourceUrl: r.source_url, publishedAt: r.published_at, createdAt: r.created_at,
     translated: r.translated === 1,
+    tags: r.tags_csv ? r.tags_csv.split(",") : [],
   }));
 }
 
@@ -2046,6 +2154,7 @@ export function updateBlogPostTranslation(
       "UPDATE blog_posts SET title = ?, excerpt = ?, description = ?, translated = 1 WHERE id = ?"
     )
     .run(data.title, data.excerpt, data.description, id);
+  setBlogPostTags(id, generateTagsFromTitle(data.title));
 }
 
 /** Kép utólagos beállítása (képjavítás sikerkor). */
