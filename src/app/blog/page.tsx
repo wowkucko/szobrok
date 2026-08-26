@@ -8,6 +8,7 @@ import Pagination from "@/components/Pagination";
 import BlogControls from "@/components/BlogControls";
 import BlogListClient from "@/components/blog/BlogListClient";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
+import ScrollToTopOnNavigate from "@/components/ScrollToTopOnNavigate";
 import { listBlogPosts, listTopTags } from "@/lib/db";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -187,6 +188,7 @@ export default async function BlogPage({
       </main>
       <Footer showNewsletter={false} />
       <ScrollToTopButton />
+      <ScrollToTopOnNavigate />
     </div>
   );
 }

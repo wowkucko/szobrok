@@ -79,13 +79,13 @@ export default function BlogListClient({
             className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40 transition-colors hover:border-amber-600/60"
           >
             <Link href={`/blog/${post.slug}`} className="flex flex-1 flex-col">
-              <div className="relative aspect-[16/10] overflow-hidden bg-zinc-900">
+              <div className="relative aspect-[4/5] overflow-hidden bg-zinc-900">
                 {post.images[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={post.images[0]}
                     alt={post.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-zinc-700">

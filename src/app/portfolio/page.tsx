@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGallery from "@/components/portfolio/ProductGallery";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
+import ScrollToTopOnNavigate from "@/components/ScrollToTopOnNavigate";
 import { getAvailableCount, getProducts, getTagOptions } from "@/lib/db";
 import { buildScaleOptions, buildSizeRanges } from "@/lib/products";
 import { parsePortfolioFilters } from "@/lib/portfolioFilters";
@@ -121,6 +122,7 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
       </main>
       <Footer />
       <ScrollToTopButton />
+      <ScrollToTopOnNavigate />
     </div>
   );
 }
