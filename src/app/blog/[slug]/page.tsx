@@ -100,18 +100,6 @@ export default async function BlogPostPage({
           })}
         </p>
 
-        {post.sourceUrl && (
-          <a
-            href={post.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-amber-600 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-[0_0_24px_rgba(217,119,6,0.18)] transition-colors hover:bg-amber-500"
-          >
-            Megtekintem a Cults3D-on
-            <ExternalLink className="h-4 w-4" />
-          </a>
-        )}
-
         {post.images[0] && (
           <div className="mt-8 overflow-hidden rounded-2xl border border-zinc-800">
             {/* eslint-disable-next-line @next/next/no-img-element */}
