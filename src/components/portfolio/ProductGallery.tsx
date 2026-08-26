@@ -7,6 +7,7 @@ import ProductCard from "./ProductCard";
 import ProductFilters from "./ProductFilters";
 import type { SizeFilterOption } from "./ProductFilters";
 import { useBookmarks } from "@/lib/useBookmarks";
+import { useIsMobile } from "@/lib/useIsMobile";
 import type { Product } from "@/types/product";
 import {
   normalizeText,
@@ -62,6 +63,12 @@ export default function ProductGallery({
   const router = useRouter();
   const { bookmarks, toggleBookmark, isBookmarked } = useBookmarks();
   const listRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+
+  // Mobilon infinite scroll: hány termék látszik épp. Asztali nézetben a
+  // megszokott oldalszámozást használjuk (lásd lentebb a `visible` számításnál).
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Helyi, nem-URL-beli állapotok
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -317,12 +324,48 @@ export default function ProductGallery({
 
   const hasActiveFilters = activeCount > 0;
 
+  // Szűrőváltozásnál mobilon visszaugrunk az elejére (az infinite scroll
+  // újra az első adaggal indul).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVisibleCount(PAGE_SIZE);
+  }, [
+    drafts.query,
+    drafts.min,
+    drafts.max,
+    selectedTags,
+    selectedSizes,
+    selectedScales,
+    sort,
+    availableOnly,
+    favoritesOnly,
+  ]);
+
+  // Mobilon: a láthatár aljára érve automatikusan betöltjük a következő adagot.
+  useEffect(() => {
+    if (!isMobile || visibleCount >= filtered.length) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: "300px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [isMobile, visibleCount, filtered.length]);
+
   // Lapozás: a szűrt/rendezett listát oldalakra vágjuk. A túl nagy oldalszám
   // (pl. szűrés szűkítése közben) az utolsó oldalra van vágva a megjelenítéshez.
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(Math.max(1, initialFilters.page), pageCount);
   const start = (safePage - 1) * PAGE_SIZE;
-  const visible = filtered.slice(start, start + PAGE_SIZE);
+  const visible = isMobile
+    ? filtered.slice(0, visibleCount)
+    : filtered.slice(start, start + PAGE_SIZE);
 
   return (
     <div>
@@ -402,54 +445,79 @@ export default function ProductGallery({
             ))}
           </div>
 
-          {/* Lapozás — a page= paraméter az URL-ben, a szűrőket megtartja */}
-          {pageCount > 1 && (
-            <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-zinc-500">
-                {filtered.length} termék · {safePage}. / {pageCount}. oldal
-              </p>
-              <nav className="flex items-center gap-1.5" aria-label="Lapozás">
+          {/* Mobilon infinite scroll (láthatár-alj automatikus betöltés),
+              asztali nézetben a megszokott oldalszámozás. */}
+          {isMobile ? (
+            visibleCount < filtered.length && (
+              <div
+                ref={sentinelRef}
+                className="mt-10 flex flex-col items-center gap-3"
+              >
                 <button
                   type="button"
-                  onClick={() => changePage(safePage - 1)}
-                  disabled={safePage <= 1}
-                  aria-label="Előző oldal"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-amber-600/60 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
+                  onClick={() =>
+                    setVisibleCount((c) =>
+                      Math.min(c + PAGE_SIZE, filtered.length)
+                    )
+                  }
+                  className="inline-flex h-10 items-center rounded-full border border-amber-600/60 bg-amber-600/15 px-6 text-sm font-medium text-amber-300 transition-colors hover:bg-amber-600/25"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  További alkotások
                 </button>
-                {pageWindow(safePage, pageCount).map((p, i) =>
-                  p === "…" ? (
-                    <span key={`gap-${i}`} className="px-1 text-sm text-zinc-600">
-                      …
-                    </span>
-                  ) : (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => changePage(p)}
-                      aria-current={p === safePage ? "page" : undefined}
-                      className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-2 text-sm font-medium transition-colors ${
-                        p === safePage
-                          ? "border-amber-600 bg-amber-600 text-zinc-950"
-                          : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-amber-600/60 hover:text-amber-500"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-                <button
-                  type="button"
-                  onClick={() => changePage(safePage + 1)}
-                  disabled={safePage >= pageCount}
-                  aria-label="Következő oldal"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-amber-600/60 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </nav>
-            </div>
+              </div>
+            )
+          ) : (
+            pageCount > 1 && (
+              <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-zinc-500">
+                  {filtered.length} termék · {safePage}. / {pageCount}. oldal
+                </p>
+                <nav className="flex items-center gap-1.5" aria-label="Lapozás">
+                  <button
+                    type="button"
+                    onClick={() => changePage(safePage - 1)}
+                    disabled={safePage <= 1}
+                    aria-label="Előző oldal"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-amber-600/60 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {pageWindow(safePage, pageCount).map((p, i) =>
+                    p === "…" ? (
+                      <span
+                        key={`gap-${i}`}
+                        className="px-1 text-sm text-zinc-600"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => changePage(p)}
+                        aria-current={p === safePage ? "page" : undefined}
+                        className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-2 text-sm font-medium transition-colors ${
+                          p === safePage
+                            ? "border-amber-600 bg-amber-600 text-zinc-950"
+                            : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-amber-600/60 hover:text-amber-500"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => changePage(safePage + 1)}
+                    disabled={safePage >= pageCount}
+                    aria-label="Következő oldal"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-amber-600/60 hover:text-amber-500 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-zinc-800 disabled:hover:text-zinc-400"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </nav>
+              </div>
+            )
           )}
         </>
       ) : (

@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Pagination from "@/components/Pagination";
 import BlogControls from "@/components/BlogControls";
+import BlogListClient from "@/components/blog/BlogListClient";
 import { listBlogPosts, listTopTags } from "@/lib/db";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
@@ -162,55 +163,23 @@ export default async function BlogPage({
             </div>
           ) : (
             <>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {posts.map((post) => (
-                  <article
-                    key={post.id}
-                    className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/40 transition-colors hover:border-amber-600/60"
-                  >
-                    <Link href={`/blog/${post.slug}`} className="flex flex-1 flex-col">
-                      <div className="relative aspect-[16/10] overflow-hidden bg-zinc-900">
-                        {post.images[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={post.images[0]}
-                            alt={post.title}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-zinc-700">
-                            <FileText className="h-8 w-8" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col p-5">
-                        <p className="text-xs text-zinc-500">
-                          {post.source} ·{" "}
-                          {new Date(post.createdAt).toLocaleDateString("hu-HU")}
-                        </p>
-                        <h2 className="mt-2 text-lg font-semibold text-zinc-100 transition-colors group-hover:text-amber-500">
-                          {post.title}
-                        </h2>
-                        {post.excerpt && (
-                          <p className="mt-2 line-clamp-3 text-sm text-zinc-400">
-                            {post.excerpt}
-                          </p>
-                        )}
-                        <span className="mt-auto pt-4 text-sm font-medium text-amber-500">
-                          Olvasom →
-                        </span>
-                      </div>
-                    </Link>
-                  </article>
-                ))}
-              </div>
-
-              <Pagination
-                page={safePage}
-                pageCount={pageCount}
+              <BlogListClient
+                initialPosts={posts}
                 total={total}
-                buildHref={buildHref}
+                perPage={pageSize}
+                q={search}
+                tag={tag}
               />
+
+              {/* Asztali nézetben a megszokott lapozás; mobilon az infinite scroll. */}
+              <div className="hidden md:block">
+                <Pagination
+                  page={safePage}
+                  pageCount={pageCount}
+                  total={total}
+                  buildHref={buildHref}
+                />
+              </div>
             </>
           )}
         </div>
