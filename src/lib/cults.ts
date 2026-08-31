@@ -59,9 +59,9 @@ export async function getCultsUserCreations(
   for (let page = 0; page < maxPages; page++) {
     const offset = page * PAGE;
     const query = `
-      query UserCreations($nick: String!, $limit: Int!, $offset: Int!) {
+      query UserCreations($nick: String!) {
         user(nick: $nick) {
-          creations(limit: $limit, offset: $offset, sort: BY_LIKES) {
+          creations(limit: ${PAGE}, offset: ${offset}, sort: BY_LIKES) {
             slug
             name(locale: EN)
             description(locale: EN)
@@ -80,7 +80,7 @@ export async function getCultsUserCreations(
         "Content-Type": "application/json",
         Authorization: auth,
       },
-      body: JSON.stringify({ query, variables: { nick: username, limit: PAGE, offset } }),
+      body: JSON.stringify({ query, variables: { nick: username } }),
     });
 
     if (!res.ok) {
