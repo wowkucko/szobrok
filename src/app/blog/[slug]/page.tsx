@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
-import { getBlogPostBySlug, getRelatedPosts } from "@/lib/db";
+import { getBlogPostBySlug, getRelatedPosts, getProducts } from "@/lib/db";
 import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BlogCard from "@/components/BlogCard";
+import BlogShopStrip from "@/components/blog/BlogShopStrip";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ export default async function BlogPostPage({
   const post = getBlogPostBySlug(slug);
   if (!post) notFound();
   const related = getRelatedPosts(slug, 3);
+  // Megvásárolható saját alkotások a portfólióból a Cults-gomb feletti sávhoz.
+  const shopProducts = getProducts().filter((p) => p.isAvailable);
 
   const paragraphs = post.description.split(/\n{2,}/).filter((p) => p.trim());
 
@@ -116,6 +119,8 @@ export default async function BlogPostPage({
             <p key={i}>{p}</p>
           ))}
         </article>
+
+        <BlogShopStrip products={shopProducts} />
 
         {post.sourceUrl && (
           <div className="mt-10 flex justify-center">
