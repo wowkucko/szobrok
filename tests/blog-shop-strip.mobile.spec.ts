@@ -3,6 +3,21 @@ import { test, expect } from "@playwright/test";
 const SLUG = "/blog/test-atreus-portrait-bust";
 
 test.describe("Blog terméksáv (mobil)", () => {
+  test("nincs vízszintes overflow (main flex-blowout regresszió)", async ({
+    page,
+  }) => {
+    await page.goto(SLUG, { waitUntil: "networkidle" });
+    const r = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+      mainWidth: document
+        .querySelector("main")!
+        .getBoundingClientRect().width,
+    }));
+    expect(r.scrollWidth).toBeLessThanOrEqual(r.innerWidth + 1);
+    expect(r.mainWidth).toBeLessThanOrEqual(r.innerWidth + 1);
+  });
+
   test("sáv megjelenik a Cults-gomb felett, nyilakkal görgethető", async ({
     page,
   }) => {
