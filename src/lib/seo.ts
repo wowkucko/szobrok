@@ -6,8 +6,45 @@ export const SITE_URL =
 
 export const SITE_NAME = "Festett Szobrok";
 
+/**
+ * A weboldal elsődleges SEO-kulcsszavai, fontossági sorrendben.
+ * Az első a fő célkulcsszó: a „festett figurák” kifejezésre a portfólió
+ * és a blog szövegei is erre épülnek (title, H1, JSON-LD keywords).
+ */
+export const SITE_KEYWORDS = [
+  "festett figurák",
+  "kézzel festett figurák",
+  "festett szobrok",
+  "3D nyomtatott figura",
+  "gyűjtői figura",
+  "figurafestés",
+  "3D nyomtatott szobrok",
+  "egyedi figura megrendelés",
+  "miniatura festés",
+  "kézzel festett szobrok",
+  "gyűjtői szobrok",
+  "akril festett figura",
+  "airbrush figura",
+  "fantasy figura",
+  "wargaming miniatűr",
+] as const;
+
+/** Kulcsszavak vesszővel elválasztott listája (meta keywords / JSON-LD). */
+export const SITE_KEYWORDS_CSV = SITE_KEYWORDS.join(", ");
+
+/**
+ * Főoldali meta leírás: tartalmazza a „festett figurák” és a „kézzel festett
+ * szobrok” célkulcsszavakat, ~155 karakteren belül (a Google általában ennyit
+ * jelenít meg a találati listában).
+ */
 export const SITE_DESCRIPTION =
-  "Kézzel festett, 3D nyomtatott szobrok és gyűjtői figurák — egyedi megrendelés, prémium műgyanta nyomtatás és kézi akril festés.";
+  "Kézzel festett 3D nyomtatott figurák és szobrok gyűjtőknek. Egyedi figurafestés, prémium gyanta nyomtatás, akril és airbrush technikával — megrendelésre is.";
+
+/**
+ * Portfólió-oldal (eladó alkotások) meta leírása a célkulcsszóval.
+ */
+export const PORTFOLIO_DESCRIPTION =
+  "Eladó, kézzel festett figurák és 3D nyomtatott szobrok — minden darab egyedi, azonnal megvásárolható. Fantasy, Sci-Fi és Cyberpunk gyűjtői figurák egy helyen.";
 
 /** Relatív útvonalból (vagy meglévő abszolút URL-ből) abszolút URL. */
 export function absoluteUrl(path: string): string {
@@ -64,7 +101,7 @@ export function ogCollageFor(
   const base = first
     .replace(/^\/api\/files\//, "")
     .replace(/\.(jpe?g|png|webp|gif|svg)$/i, "");
-  // A „v2" verzió: a korábbi (középre vágott) kollázsok helyett a
+  // A „v2” verzió: a korábbi (középre vágott) kollázsok helyett a
   // figyelem-alapú vágású változat készül el automatikusan a frissítés után.
   return absoluteUrl(`/api/files/og-collage-v2-${base}.png`);
 }

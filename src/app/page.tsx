@@ -43,8 +43,8 @@ export default function Home() {
               </h2>
               <p className="mt-4 leading-7 text-zinc-400">
                 Iratkozz fel a hírlevélre, és elsőként értesülj az új kézzel
-                festett szobrokról, valamint az egyedi megrendelési
-                lehetőségekről.
+                festett figurákról és szobrokról, valamint az egyedi
+                megrendelési lehetőségekről.
               </p>
             </div>
             <div className="mx-auto mt-10 max-w-2xl">

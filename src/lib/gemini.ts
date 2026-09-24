@@ -15,6 +15,19 @@ export interface TranslateInput {
   keywords: string[];
 }
 
+/**
+ * Alap SEO-kulcsszavak, ha az admin nem adott meg semmit. Az első a fő
+ * célkulcsszó: a generált bejegyzésekben is ez szerepeljen a leggyakrabban.
+ */
+export const BASE_BLOG_KEYWORDS = [
+  "festett figurák",
+  "kézzel festett figurák",
+  "3D nyomtatott figura",
+  "gyűjtői figura",
+  "figurafestés",
+  "festett szobrok",
+];
+
 function extractJson(text: string): unknown {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -29,11 +42,11 @@ export async function translateBlogPost(
   const keywordList =
     input.keywords && input.keywords.length
       ? input.keywords.join(", ")
-      : "(nincs megadva kulcsszó)";
+      : BASE_BLOG_KEYWORDS.join(", ");
 
   const prompt = `Te egy magyar nyelvű, 3D nyomtatott festett szobrokat árusító webáruház (festettszobrok.com) blog szerkesztője vagy.
 A feladatod: a megadott 3D nyomtatott modell (Cults3D) angol címét és leírását fordítsd le természetes, olvasmányos magyar nyelvre, és írj belőle egy vonzó blogbejegyzést.
-A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns).
+A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns). Különösen a "festett figurák" és a "kézzel festett figurák" kifejezéseket próbáld meg minden bejegyzésben szerepeltetni, ahol az gördülékenyen megoldható.
 A bejegyzés legyen 2-4 rövid bekezdés, barátságos hangvételű, mintha egy kézműves műhely mutatná be a modellt.
 Ne említsd a "Cults3D" szót kötelezően, de ha a forrás fontos, egy természetes utalás megengedett.
 FONTOS: A címben és a szövegben előforduló sajátneveket — személyek, karakterek, márkák, termék‑/modellnevek, figurák nevei — NE fordítsd le és NE torzítsd el (ne magyarosítsd, ne átírd); tartsd meg őket pontosan az eredeti (angol) alakjukban. Csak a környező leíró szöveget fordítsd magyarra. Ha a cím gyakorlatilag csak a figura nevéből áll, hagyd a címet az eredeti névvel (esetleg rövid magyar körülírással kiegészítve, de a név változatlan marad).
@@ -99,7 +112,7 @@ export async function translateBlogPosts(
   const keywordList =
     inputs[0].keywords && inputs[0].keywords.length
       ? inputs[0].keywords.join(", ")
-      : "(nincs megadva kulcsszó)";
+      : BASE_BLOG_KEYWORDS.join(", ");
 
   const listText = inputs
     .map(
@@ -112,7 +125,7 @@ export async function translateBlogPosts(
 
   const prompt = `Te egy magyar nyelvű, 3D nyomtatott festett szobrokat árusító webáruház (festettszobrok.com) blog szerkesztője vagy.
 A feladatod: az alábbi 3D nyomtatott modellek (Cults3D) angol címét és leírását fordítsd le természetes, olvasmányos magyar nyelvre, és írj belőlük vonzó blogbejegyzéseket.
-A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns).
+A szövegben természetes módon, erőltetés nélkül építs be néhányat a megadott SEO kulcsszavak közül (ha releváns). Különösen a "festett figurák" és a "kézzel festett figurák" kifejezéseket próbáld meg minden bejegyzésben szerepeltetni, ahol az gördülékenyen megoldható.
 Minden bejegyzés legyen 2-4 rövid bekezdés, barátságos hangvételű. Ne emlékeztess kötelezően a "Cults3D" szóra.
 FONTOS: A címben és a szövegben előforduló sajátneveket — személyek, karakterek, márkák, termék‑/modellnevek, figurák nevei — NE fordítsd le és NE torzítsd el (ne magyarosítsd, ne átírd); tartsd meg őket pontosan az eredeti (angol) alakjukban. Csak a környező leíró szöveget fordítsd magyarra. Ha egy cím csak a figura nevéből áll, hagyd azt az eredeti névvel (esetleg rövid magyar körülírással, de a név változatlan marad).
 

@@ -8,6 +8,7 @@ import ScrollToTopOnNavigate from "@/components/ScrollToTopOnNavigate";
 import { getAvailableCount, getProducts, getTagOptions } from "@/lib/db";
 import { buildScaleOptions, buildSizeRanges } from "@/lib/products";
 import { parsePortfolioFilters } from "@/lib/portfolioFilters";
+import { PORTFOLIO_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -29,9 +30,8 @@ export async function generateMetadata({
   const query = qs.toString();
   const self = query ? `/portfolio?${query}` : "/portfolio";
 
-  const title = "Megvásárolható Alkotások";
-  const description =
-    "Egyedileg nyomtatott és kézzel festett gyűjtői figurák. Minden darab egyedi és azonnal megvásárolható.";
+  const title = "Kézzel festett figurák — eladó gyűjtői alkotások";
+  const description = PORTFOLIO_DESCRIPTION;
 
   return {
     title,
@@ -40,20 +40,20 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       url: self,
-      title: `${title} — Festett Szobrok`,
+      title: `${title} — ${SITE_NAME}`,
       description,
       images: [
         {
           url: "/images/og-default.png",
           width: 1200,
           height: 630,
-          alt: "Megvásárolható kézzel festett szobrok",
+          alt: "Megvásárolható kézzel festett figurák és szobrok",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} — Festett Szobrok`,
+      title: `${title} — ${SITE_NAME}`,
       description,
       images: ["/images/og-default.png"],
     },
@@ -83,9 +83,28 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
   // (a méretarány nélküli darabok „Egyedi méret" opciót kapnak).
   const scaleOptions = buildScaleOptions(products);
 
+  // Strukturált adat: a portfólió elemei ItemList-ként — így a Google
+  // a termékkártyák URL-jét és sorrendjét is értelmezni tudja.
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Kézzel festett figurák — megvásárolható alkotások",
+    numberOfItems: products.length,
+    itemListElement: products.map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${SITE_URL}/portfolio/${p.id}`,
+      name: p.title,
+    })),
+  };
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-950 text-zinc-100">
       <Navbar />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+      />
       <main className="flex-1">
         <section className="border-b border-zinc-800/60 bg-[radial-gradient(ellipse_at_top,rgba(217,119,6,0.08),transparent_60%)]">
           <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
@@ -96,12 +115,14 @@ export default async function PortfolioPage({ searchParams }: PageProps) {
             <h1 className="mt-6 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
               Megvásárolható{" "}
               <span className="bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">
-                Alkotások
-              </span>
+                kézzel festett figurák
+              </span>{" "}
+              és szobrok
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-400">
-              Egyedileg nyomtatott és kézzel festett gyűjtői figurák. Minden
-              darab egyedi és azonnal megvásárolható.
+              Egyedileg nyomtatott és kézzel festett gyűjtői figurák — minden
+              darab egyedi és azonnal megvásárolható. Fantasy, Sci-Fi és
+              Cyberpunk témák, akril és airbrush technikával festve.
             </p>
             <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-600/30 bg-amber-600/10 px-4 py-2 text-sm font-medium text-amber-500">
               <Package className="h-4 w-4" />

@@ -35,7 +35,13 @@ import {
   getRelatedProducts,
 } from "@/lib/db";
 import { formatPrice } from "@/lib/products";
-import { SITE_NAME, SITE_URL, ogCollageFor, ogImageFor } from "@/lib/seo";
+import {
+  SITE_NAME,
+  SITE_URL,
+  SITE_KEYWORDS,
+  ogCollageFor,
+  ogImageFor,
+} from "@/lib/seo";
 
 // Az admin felületen végzett módosítások legfeljebb 60 másodpercen belül
 // megjelennek a részletező oldalakon is (ISR).
@@ -49,7 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const product = getProductById(id);
   if (!product) return { title: "Nem található" };
-  const title = `${product.title} — Festett Szobrok`;
+  const title = `${product.title} — kézzel festett figura | ${SITE_NAME}`;
   // Megosztási előnézet: a kollázs (első 4 fotó + ár), ha van feltöltött kép,
   // különben az egyképes OG-kép. A kollázs CSAK a megosztásban látszik.
   const shareImage = ogCollageFor(product) ?? ogImageFor(product);
@@ -107,6 +113,9 @@ export default async function ProductDetailPage({ params }: Props) {
         sku: product.id,
         category: product.category,
         brand: { "@type": "Brand", name: SITE_NAME },
+        // A Google a kereséskor felhasználható kiegészítő kulcsszavak:
+        // az oldal célkulcsszavai + a termék saját címkéi.
+        keywords: [...SITE_KEYWORDS, ...product.tags].join(", "),
         offers: {
           "@type": "Offer",
           url: productUrl,
@@ -261,6 +270,9 @@ export default async function ProductDetailPage({ params }: Props) {
 
             <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
               {product.title}
+              <span className="mt-2 block text-lg font-normal leading-7 text-zinc-500">
+                Kézzel festett, 3D nyomtatott gyűjtői figura
+              </span>
             </h1>
             <p className="mt-3 text-lg leading-8 text-zinc-400">
               {product.shortDescription}

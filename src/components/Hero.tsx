@@ -6,14 +6,15 @@ export default function Hero() {
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 md:grid-cols-2 md:py-28">
         <div>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
-            Kézzel festett 3D nyomtatott szobrok{" "}
+            Kézzel festett figurák és 3D nyomtatott szobrok{" "}
             <span className="bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">
-              & gyűjtői figurák
+              gyűjtőknek
             </span>
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-8 text-zinc-400">
-            Szenvedéllyel megálmodott, egyedileg nyomtatott és részletgazdagon
-            megfestett alkotások gyűjtőknek és rajongóknak.
+            Egyedileg nyomtatott, részletgazdagon megfestett gyűjtői figurák —
+            prémium gyanta nyomtatás, kézi akril és airbrush festés. Szenvedéllyel
+            készült alkotások gyűjtőknek és rajongóknak.
           </p>
         </div>
         <div className="group relative">

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getBlogPostBySlug, getRelatedPosts, getProducts } from "@/lib/db";
-import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, SITE_KEYWORDS, absoluteUrl } from "@/lib/seo";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BlogCard from "@/components/BlogCard";
@@ -23,6 +23,7 @@ export async function generateMetadata({
   return {
     title: post.title,
     description: desc,
+    keywords: [...SITE_KEYWORDS, ...post.tags],
     alternates: { canonical: `/blog/${post.slug}` },
     robots: post.translated ? undefined : { index: false, follow: false },
     openGraph: {
@@ -72,6 +73,7 @@ export default async function BlogPostPage({
     author: { "@type": "Person", name: post.source },
     publisher: { "@id": `${SITE_URL}/#organization` },
     mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/blog/${post.slug}` },
+    keywords: [...SITE_KEYWORDS, ...post.tags].join(", "),
   };
 
   return (

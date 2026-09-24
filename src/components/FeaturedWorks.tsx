@@ -15,8 +15,8 @@ export default async function FeaturedWorks() {
       <div className="mx-auto max-w-6xl px-6 py-24">
         <SectionHeading
           index="01"
-          title="Kiemelt alkotások"
-          subtitle="Egy ízelítő a galériából — minden darab egyedi, kézzel készült."
+          title="Kiemelt festett figurák"
+          subtitle="Ízelítő a galériából — minden darab egyedi, kézzel festett gyűjtői figura."
         />
         <div className="mt-12">
           <FeaturedCarousel products={products} />
@@ -27,7 +27,7 @@ export default async function FeaturedWorks() {
             href="/portfolio"
             className="inline-flex h-12 items-center gap-2 rounded-full border border-zinc-700 px-6 text-sm font-medium text-zinc-200 transition-colors hover:border-amber-600 hover:text-amber-500"
           >
-            Összes megvásárolható termék megtekintése
+            Összes kézzel festett figura megtekintése
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

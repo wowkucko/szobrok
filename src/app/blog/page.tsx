@@ -10,7 +10,7 @@ import BlogListClient from "@/components/blog/BlogListClient";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import ScrollToTopOnNavigate from "@/components/ScrollToTopOnNavigate";
 import { listBlogPosts, listTopTags } from "@/lib/db";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, SITE_KEYWORDS } from "@/lib/seo";
 
 const PER_PAGE_OPTIONS = [9, 12, 18, 24];
 const DEFAULT_PER = 9;
@@ -23,9 +23,10 @@ export async function generateMetadata({
   const sp = await searchParams;
   const req = Math.max(1, Number(sp.page) || 1);
   return {
-    title: `Blog | ${SITE_NAME}`,
+    title: `Blog — figurafestés és 3D nyomtatás | ${SITE_NAME}`,
     description:
-      "3D nyomtatott, kézzel festett szobrok és gyűjtői figurák inspirációi, tervezői bemutatók és kedvezmények a műhely blogján.",
+      "Kézzel festett figurák, 3D nyomtatott szobrok és gyűjtői darabok — műhelytörténetek, tervezői bemutatók és kedvezmények magyarul.",
+    keywords: [...SITE_KEYWORDS],
     alternates: { canonical: req <= 1 ? "/blog" : `/blog?page=${req}` },
   };
 }
@@ -102,11 +103,11 @@ export default async function BlogPage({
               Műhely blog
             </p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">
-              Írások, tervezők, inspiráció
+              Figurafestés és 3D nyomtatás — írások, tervezők, inspiráció
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-400">
-              A 3D nyomtatott művészet és a kézzel festett szobrok világa — a
-              legjobb Cults3D alkotók modelljei, magyarul, gyűjtői szemmel.
+              A kézzel festett figurák és a 3D nyomtatott művészet világa — a
+              legjobb alkotók modelljei, magyarul, gyűjtői szemmel.
             </p>
           </div>
         </header>

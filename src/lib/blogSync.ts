@@ -173,14 +173,19 @@ async function translateBatchWithRetry(
       return { items: translated.map((t) => ({ translated: t, ok: true })) };
     } catch (e) {
       const msg = String(e);
-      if (!/429|rate|ECONN|ETIMEDOUT|fetch failed/i.test(msg)) {
+      // Újrapróbálható hibák: kvóta (429), átmeneti túlterhelés (UNAVAILABLE / 503,
+      // 500-as szerverhibák) és hálózati problémák. Ezek a Gemini-nél gyakoriak,
+      // és jellemzően percek/órák múlva maguktól helyreállnak.
+      const retryable =
+        /429|rate|ECONN|ETIMEDOUT|fetch failed|UNAVAILABLE|RESOURCE_EXHAUSTED|\b5\d\d\b/i.test(msg);
+      if (!retryable) {
         logBlog(
           "error",
           `Kötegelő fordítás végleg sikertelen (nem újrapróbálható): ${describeGeminiError(e)}`
         );
         break;
       }
-      const isQuota = /429|rate|RESOURCE_EXHAUSTED/i.test(msg);
+      const isQuota = /429|rate|RESOURCE_EXHAUSTED|UNAVAILABLE|\b5\d\d\b/i.test(msg);
       // Szinkron importnál a kvóta hiba nem akadályozhatja a mentést: a
       // bejegyzés angolul marad (translated = 0), később újrafordítva.
       // Hálózati hiba esetén is csak véges próba.
@@ -260,6 +265,8 @@ export async function syncSource(
     updateBlogSourceSync(username, { total: creations.length });
     logBlog("info", `${username}: ${creations.length} modell lekérve a Cults3D-ről, fordítás indul${geminiKey ? "" : " (figyelem: GEMINI_API_KEY hiányzik – angolul maradnak)"}…`);
 
+    // Admin által megadott SEO-kulcsszavak. Ha üres a lista, a Gemini prompt
+    // a beépített alaplistát használja (a fő célkulcsszóval: „festett figurák”).
     const keywords = listBlogKeywords().map((k) => k.keyword);
     const limit = opts.maxNew && opts.maxNew > 0 ? opts.maxNew : creations.length;
     const base = countBlogPostsBySource(username);

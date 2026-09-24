@@ -6,8 +6,10 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_URL,
+  SITE_KEYWORDS_CSV,
   absoluteUrl,
 } from "@/lib/seo";
+import { SOCIAL_LINKS } from "@/components/SocialBrand";
 import ReferralTracker from "@/components/ReferralTracker";
 
 // Google Search Console verifikáció. Ha a NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
@@ -33,10 +35,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — Kézzel festett 3D nyomtatott szobrok`,
+    default: `${SITE_NAME} — Kézzel festett figurák és 3D nyomtatott szobrok`,
     template: `%s — ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
+  keywords: [...SITE_KEYWORDS_CSV.split(", ")],
   applicationName: SITE_NAME,
   alternates: { canonical: "/" },
   openGraph: {
@@ -44,20 +47,20 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: "hu_HU",
     url: "/",
-    title: `${SITE_NAME} — Kézzel festett 3D nyomtatott szobrok`,
+    title: `${SITE_NAME} — Kézzel festett figurák és 3D nyomtatott szobrok`,
     description: SITE_DESCRIPTION,
     images: [
       {
         url: "/images/og-default.png",
         width: 1200,
         height: 630,
-        alt: `${SITE_NAME} — kézzel festett 3D nyomtatott szobrok és gyűjtői figurák`,
+        alt: `${SITE_NAME} — kézzel festett figurák és gyűjtői szobrok`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} — Kézzel festett 3D nyomtatott szobrok`,
+    title: `${SITE_NAME} — Kézzel festett figurák és 3D nyomtatott szobrok`,
     description: SITE_DESCRIPTION,
     images: ["/images/og-default.png"],
   },
@@ -96,15 +99,27 @@ const orgJsonLd = {
       name: SITE_NAME,
       url: SITE_URL,
       logo: absoluteUrl("/icon.svg"),
-      description: SITE_DESCRIPTION,
+      image: absoluteUrl("/images/og-default.png"),
+      description:
+        "Kézzel festett figurák és 3D nyomtatott gyűjtői szobrok — egyedi megrendelés, prémium műgyanta nyomtatás és kézi akril festés.",
+      sameAs: SOCIAL_LINKS.map((s) => s.href),
     },
     {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
       url: SITE_URL,
       name: SITE_NAME,
+      alternateName: "festettszobrok.com",
       inLanguage: "hu-HU",
       publisher: { "@id": `${SITE_URL}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${SITE_URL}/portfolio?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
     },
   ],
 };

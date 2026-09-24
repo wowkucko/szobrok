@@ -7,7 +7,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin"],
+        // A form-ok (POST végpontok) és a feltöltött fájlok indexelése értelmetlen,
+        // az admin védett — a crawler-ek ide ne is menjenek.
+        disallow: ["/admin", "/api/"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
