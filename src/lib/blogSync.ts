@@ -7,6 +7,7 @@
 
 import path from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
 import {
   listBlogSources,
   listBlogKeywords,
@@ -46,6 +47,40 @@ let translateRunning = false;
 
 /** Egyszerre csak egy képjavítás futhat. */
 let imageFixRunning = false;
+
+const GEMINI_IMAGE_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+};
+
+/**
+ * A bejegyzés bemutatóképének beolvasása a Gemini képelemzéshez.
+ * A /api/files/<name> URL-ből a fájlnevet a data/uploads mappában keressük
+ * (a letöltött blogképek itt vannak). Túl nagy képnél null (a Gemini limitje).
+ */
+async function readImageForGemini(
+  imageUrl: string | undefined
+): Promise<{ data: string; mimeType: string } | null> {
+  try {
+    if (!imageUrl || !imageUrl.startsWith("/api/files/")) return null;
+    const name = decodeURIComponent(imageUrl.slice("/api/files/".length));
+    if (!name || name.includes("/") || name.includes("\\\\")) return null;
+    const file = path.join(UPLOAD_DIR, name);
+    const info = await stat(file).catch(() => null);
+    if (!info || !info.isFile() || info.size === 0 || info.size > 15 * 1024 * 1024) {
+      return null;
+    }
+    const mime = GEMINI_IMAGE_MIME[path.extname(name).toLowerCase()];
+    if (!mime) return null;
+    const buf = await readFile(file);
+    return { data: buf.toString("base64"), mimeType: mime };
+  } catch {
+    return null;
+  }
+}
 
 type Creation = NonNullable<Awaited<ReturnType<typeof getCultsUserCreations>>[number]>;
 
@@ -148,19 +183,18 @@ async function translateBatchWithRetry(
   inputs: { title: string; description: string; keywords: string[] }[],
   geminiKey: string | undefined,
   loopOnQuota = true
-): Promise<{ items: { translated: TranslatedPost; ok: boolean }[] }> {
-  if (!geminiKey || inputs.length === 0) {
+): Promise<{ items: { translated: TranslatedPost; ok: boolean }[] }> {    if (!geminiKey || inputs.length === 0) {
     if (!geminiKey) logBlog("warn", "Kötegelő fordítás kihagyva: hiányzik a GEMINI_API_KEY.");
     return {
       items: inputs.map((i) => ({
-        translated: { title: i.title, excerpt: "", description: i.description },
+        translated: { title: i.title, excerpt: "", description: i.description, tags: [] },
         ok: false,
       })),
     };
   }
   const failedItems = (): { items: { translated: TranslatedPost; ok: boolean }[] } => ({
     items: inputs.map((i) => ({
-      translated: { title: i.title, excerpt: "", description: i.description },
+      translated: { title: i.title, excerpt: "", description: i.description, tags: [] },
       ok: false,
     })),
   });
@@ -276,28 +310,40 @@ export async function syncSource(
     // Kötegelő fordítás: az új bejegyzéseket BATCH_SIZE-ként fordítjuk egy
     // Gemini-hívásban, hogy a napi ingyenes kvótát ne lépjük túl feleslegesen.
     const buffer: Creation[] = [];
+    const downloaded: (string | null)[] = [];
 
     const flushBuffer = async (): Promise<boolean> => {
       if (buffer.length === 0) return false;
-      const inputs = buffer.map((b) => ({
+      // A képek elöl letöltődnek, hogy a Gemini a bemutatófotót elemezhesse
+      // (hosszabb, képre fókuszáló cikk készül belőle).
+      const images: ({ data: string; mimeType: string } | null)[] = [];
+      for (const b of buffer) {
+        const localUrl = await downloadImage(b.image);
+        images.push(await readImageForGemini(localUrl ?? undefined));
+        downloaded.push(localUrl);
+      }
+      const inputs = buffer.map((b, i) => ({
         title: b.title,
         description: b.description,
         keywords,
+        ...(images[i] ? { image: images[i]! } : {}),
       }));
       const { items } = await translateBatchWithRetry(inputs, geminiKey, false);
       let justNow = 0;
       for (let i = 0; i < buffer.length; i++) {
+        // A kép már elöl letöltődött (a Gemini képelemzéséhez) — itt csak mentjük.
         if (cancelled.has(username)) {
           cancelled.delete(username);
           logBlog("warn", `${username}: szinkron leállítva (Leállítás gomb).`);
           updateBlogSourceSync(username, { status: "cancelled", error: null });
           touchBlogSource(username);
           buffer.length = 0;
+          downloaded.length = 0;
           return true;
         }
         const b = buffer[i];
         const t = items[i];
-        const image = await downloadImage(b.image);
+        const image = downloaded[i] ?? null;
         insertBlogPost({
           source: username,
           cultsId: b.slug,
@@ -309,6 +355,7 @@ export async function syncSource(
           sourceUrl: b.url,
           publishedAt: b.publishedAt,
           translated: t.ok,
+          geminiTags: t.translated.tags,
         });
         if (t.ok) justNow++;
         imported++;
@@ -317,12 +364,14 @@ export async function syncSource(
           updateBlogSourceSync(username, { status: "done", progress: base + imported });
           touchBlogSource(username);
           buffer.length = 0;
+          downloaded.length = 0;
           return true;
         }
         await sleep(batchDelay);
       }
       logBlog("info", `${username}: köteg mentve — +${justNow} lefordítva, ${buffer.length} feldolgozva (össz.: ${base + imported}).`);
       buffer.length = 0;
+      downloaded.length = 0;
       return false;
     };
 
@@ -424,17 +473,29 @@ export async function translateUntranslated(
 
   for (let i = 0; i < posts.length; i += BATCH_SIZE) {
     const slice = posts.slice(i, i + BATCH_SIZE);
-    const inputs = slice.map((p) => ({
-      title: p.title,
-      description: p.description,
-      keywords: [],
-    }));
+    // Admin kulcsszavak (ha üresek, a Gemini az alaplistát használja).
+    const keywords = listBlogKeywords().map((k) => k.keyword);
+    const inputs = [];
+    for (const p of slice) {
+      const image = await readImageForGemini(p.images?.[0]);
+      inputs.push({
+        title: p.title,
+        description: p.description,
+        keywords,
+        ...(image ? { image } : {}),
+      });
+    }
     const { items } = await translateBatchWithRetry(inputs, geminiKey);
     let bt = 0;
     let bf = 0;
     for (let j = 0; j < slice.length; j++) {
       if (items[j].ok) {
-        updateBlogPostTranslation(slice[j].id, items[j].translated);
+        updateBlogPostTranslation(slice[j].id, {
+          title: items[j].translated.title,
+          excerpt: items[j].translated.excerpt,
+          description: items[j].translated.description,
+          geminiTags: items[j].translated.tags,
+        });
         translated++;
         bt++;
       } else {

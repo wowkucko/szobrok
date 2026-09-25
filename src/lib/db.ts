@@ -1959,22 +1959,72 @@ const GENERIC_TAGS = new Set([
   "collector", "design", "designer", "mini", "miniature", "scale", "fan",
   "fans", "game", "games", "movie", "movies", "series", "edition", "limited",
   "premium", "quality", "detail", "details", "studio", "inspiration", "idea",
-  "ideas", "diy", "make", "making", "tutorial", "review", "best", "top", "new",
+  "ideas", "diy", "make", "making",  "tutorial", "review", "best", "top", "new",
   "shop", "store", "buy",
+  // gyakori, nem megkülönböztető szavak a hosszabb cikkszövegekből
+  "aminek", "amely", "amelyik", "akkor", "minden", "mindent", "valamint",
+  "illetve", "szerint", "alapján", "között", "mellett", "ellen", "után",
+  "nálunk", "nélkül", "közben", "alatt", "felett", "alattad", "can", "will",
+  "this", "that", "with", "your", "have", "has", "are", "was", "were", "not",
+  "but", "all", "any", "out", "into", "over", "under", "more", "most", "very",
+  "also", "just", "like", "make", "made", "well", "even", "still", "being",
+  "their", "them", "they", "these", "those", "such", "each", "every", "some",
 ]);
 
-/** Címkék generálása egy bejegyzés címéből (helyi, ingyenes, nyelvfüggetlen tokenizálás). */
-export function generateTagsFromTitle(title: string, maxTags = 6): string[] {
-  if (!title) return [];
+/**
+ * Címkék generálása szövegből (helyi, ingyenes tokenizálás): a cím és a
+ * leírás megkülönböztető szavait gyűjti ki, a szigorúan általános szavakat
+ * kiszűri. A cím szavai előre sorolódnak (nagyobb súly).
+ */
+export function generateTagsFromTitle(
+  title: string,
+  maxTags = 6,
+  extraText?: string
+): string[] {
+  const combined = extraText ? `${title} ${title} ${extraText}` : title;
   const seen = new Set<string>();
   const tags: string[] = [];
-  for (const t of tokenize(title)) {
+  for (const t of tokenize(combined)) {
     if (GENERIC_TAGS.has(t) || seen.has(t)) continue;
     seen.add(t);
     tags.push(t);
     if (tags.length >= maxTags) break;
   }
   return tags;
+}
+
+/** Admin kulcsszavakból képzett címkék (legfeljebb 3, rövid kulcsszavakból). */
+function keywordTags(keywords: string[], max = 3): string[] {
+  const out: string[] = [];
+  for (const k of keywords) {
+    const kw = k.trim().toLowerCase();
+    if (!kw || kw.split(/\s+/).length > 3) continue;
+    if (!out.includes(kw)) out.push(kw);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/**
+ * Teljes címke-készlet egy bejegyzéshez: a Gemini által javasolt címkék
+ * (ha vannak), a cím/leírás tokenjei és az admin SEO-kulcsszavak —
+ * deduplikálva, a relevánsak elöl.
+ */
+export function buildBlogPostTags(
+  post: { title: string; excerpt?: string; description?: string },
+  geminiTags: string[] = [],
+  adminKeywords: string[] = []
+): string[] {
+  const body = [post.excerpt, post.description].filter(Boolean).join(" ");
+  const tokenTags = generateTagsFromTitle(post.title, 8, body.slice(0, 4000));
+  const merged: string[] = [];
+  for (const t of [...geminiTags, ...tokenTags, ...keywordTags(adminKeywords)]) {
+    const tag = t.trim().toLowerCase();
+    if (!tag || tag.length < 2 || merged.includes(tag)) continue;
+    merged.push(tag);
+    if (merged.length >= 14) break;
+  }
+  return merged;
 }
 
 /** Egy bejegyzés címkéinek felülírása (a post_id szinten tárolva). */
@@ -2002,20 +2052,29 @@ export function listTopTags(limit = 24): { tag: string; count: number }[] {
     .all(limit) as { tag: string; count: number }[];
 }
 
-/** Összes meglévő bejegyzés címkéinek újragenerálása a címből (visszatöltés). */
+/** Összes meglévő bejegyzés címkéinek újragenerálása (cím + leírás alapján). */
 export function backfillBlogTags(): { updated: number } {
   const db = getDb();
-  const rows = db.prepare("SELECT id, title FROM blog_posts").all() as {
+  const rows = db
+    .prepare("SELECT id, title, excerpt, description FROM blog_posts")
+    .all() as unknown as {
     id: string;
     title: string;
+    excerpt: string;
+    description: string;
   }[];
+  const adminKeywords = listBlogKeywords().map((k) => k.keyword);
   const del = db.prepare("DELETE FROM blog_post_tags WHERE post_id = ?");
   const ins = db.prepare("INSERT OR IGNORE INTO blog_post_tags (post_id, tag) VALUES (?, ?)");
   let updated = 0;
   try {
     db.exec("BEGIN");
     for (const r of rows) {
-      const tags = generateTagsFromTitle(r.title);
+      const tags = buildBlogPostTags(
+        { title: r.title, excerpt: r.excerpt, description: r.description },
+        [],
+        adminKeywords
+      );
       del.run(r.id);
       for (const t of tags) ins.run(r.id, t);
       updated++;
@@ -2086,7 +2145,9 @@ export function getBlogPostByCultsId(cultsId: string): BlogPost | null {
   );
 }
 
-export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt" | "tags">): { status: "inserted" | "exists" } {
+export function insertBlogPost(
+  input: Omit<BlogPost, "id" | "createdAt" | "tags"> & { geminiTags?: string[] }
+): { status: "inserted" | "exists" } {
   const db = getDb();
   const exists = db.prepare("SELECT 1 FROM blog_posts WHERE cults_id = ?").get(input.cultsId);
   if (exists) return { status: "exists" };
@@ -2108,7 +2169,14 @@ export function insertBlogPost(input: Omit<BlogPost, "id" | "createdAt" | "tags"
     new Date().toISOString(),
     input.translated ? 1 : 0
   );
-  setBlogPostTags(id, generateTagsFromTitle(input.title));
+  setBlogPostTags(
+    id,
+    buildBlogPostTags(
+      { title: input.title, excerpt: input.excerpt, description: input.description },
+      input.geminiTags ?? [],
+      listBlogKeywords().map((k) => k.keyword)
+    )
+  );
   return { status: "inserted" };
 }
 
@@ -2147,14 +2215,21 @@ export function listUntranslatedPosts(): BlogPost[] {
 /** Fordítás utólagos frissítése (újrafordítás sikerkor). */
 export function updateBlogPostTranslation(
   id: string,
-  data: { title: string; excerpt: string; description: string }
+  data: { title: string; excerpt: string; description: string; geminiTags?: string[] }
 ): void {
   getDb()
     .prepare(
       "UPDATE blog_posts SET title = ?, excerpt = ?, description = ?, translated = 1 WHERE id = ?"
     )
     .run(data.title, data.excerpt, data.description, id);
-  setBlogPostTags(id, generateTagsFromTitle(data.title));
+  setBlogPostTags(
+    id,
+    buildBlogPostTags(
+      { title: data.title, excerpt: data.excerpt, description: data.description },
+      data.geminiTags ?? [],
+      listBlogKeywords().map((k) => k.keyword)
+    )
+  );
 }
 
 /** Kép utólagos beállítása (képjavítás sikerkor). */

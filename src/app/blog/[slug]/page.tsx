@@ -57,6 +57,9 @@ export default async function BlogPostPage({
   const shopProducts = getProducts().filter((p) => p.isAvailable);
 
   const paragraphs = post.description.split(/\n{2,}/).filter((p) => p.trim());
+  // A '## ' előtaggal jelölt alcímek (a Gemini cikkíró jelölése) h2-ként jelennek meg.
+  const isHeading = (p: string) => /^##\s+/.test(p.trim());
+  const headingText = (p: string) => p.trim().replace(/^##\s+/, "");
 
   const articleJsonLd = {
     "@context": "https://schema.org",
@@ -117,9 +120,18 @@ export default async function BlogPostPage({
         )}
 
         <article className="mt-8 space-y-5 break-words text-[15px] leading-7 text-zinc-300">
-          {paragraphs.map((p, i) => (
-            <p key={i}>{p}</p>
-          ))}
+          {paragraphs.map((p, i) =>
+            isHeading(p) ? (
+              <h2
+                key={i}
+                className="pt-2 text-xl font-semibold tracking-tight text-amber-100"
+              >
+                {headingText(p)}
+              </h2>
+            ) : (
+              <p key={i}>{p}</p>
+            )
+          )}
         </article>
 
         <BlogShopStrip products={shopProducts} />
