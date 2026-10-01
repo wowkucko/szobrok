@@ -1008,17 +1008,13 @@ export function queryProducts(query: ProductQuery = {}): {
     });
   }
 
-  // Rendezés (magyar collation, stabil)
-  const dir = query.dir === "asc" ? 1 : -1;
+  // Rendezés (magyar collation, stabil) — az alap (sort) a saját, drag&drop-
+  // pal állított sorrend, pontosan úgy, mint a getProducts() SELECT-je, így
+  // az admin táblázat 1:1 tükrözi a portfólió „Ajánlott sorrend" nézetét.
+  // A függvényszintű alapértelmezés NÖVEKVŐ — csak a kifejezett "desc" fordít.
+  const dir = query.dir === "desc" ? -1 : 1;
   const sort = query.sort ?? "sortOrder";
   products.sort((a, b) => {
-    // Az „Összes termék" nézetben (available=all) a nem elérhető (elkelt)
-    // termékek MINDIG a lista végére kerülnek, függetlenül a választott
-    // rendezéstől — így az aktív készlet mindig elöl van.
-    const allView = query.available === "all" || query.available === undefined;
-    if (allView && a.isAvailable !== b.isAvailable) {
-      return a.isAvailable ? -1 : 1;
-    }
     // Kiemelt / Elérhető: az aktív (bekapcsolt) értékek MINDIG elöl vannak,
     // iránytól függetlenül — a nyíl csak a csoporton belüli másodlagos
     // rendezést (feltöltési dátum) váltja át.
@@ -1045,7 +1041,13 @@ export function queryProducts(query: ProductQuery = {}): {
         cmp = a.price - b.price;
         break;
       case "sortOrder":
+        // Stabil, holtverseny-mentes: ha (ritkán) egyezik a sort_order,
+        // a frissebb (created_at desc) kerül elölre — mint a getProducts()-ban.
         cmp = a.sortOrder - b.sortOrder;
+        if (cmp === 0) {
+          cmp =
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
         break;
       default:
         cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -1082,7 +1084,7 @@ export function updateProductFlag(
   return (result as { changes: number }).changes > 0;
 }
 
-/** Kiemelt termékek a főoldalra (featured = 1), legfrissebb elöl.
+/** Kiemelt termékek a főoldalra (featured = 1), a saját sorrendben.
  *  Az elkelt (nem elérhető) kiemeltek is bekerülhetnek — a kártya
  *  „Elkelt" bélyeget kap rajtuk. */
 export function getFeaturedProducts(limit = 4): Product[] {
@@ -1098,25 +1100,62 @@ export function getFeaturedProducts(limit = 4): Product[] {
 }
 
 /**
- * A saját sorrend beállítása drag&drop után. A kliens a látható sorok ÚJ
- * sorrendjét küldi ({ ids }); a szerver ezt a blokkot a globális sorrend
- * elejére helyezi, a többi termék relatív sorrendje változatlan marad.
- * Az admin alap nézetében (nincs szűrő/rendezés, 1. oldal) ez a látható
- * blokk eleve az elején van, így a húzás pontosan azt adja, amit látsz.
+ * A saját sorrend beállítása drag&drop után.
+ *
+ * Két hívási forma:
+ *  1. { ids } — a látható blokk ÚJ sorrendje. A blokk a jelenlegi pozícióján
+ *     marad, a többi termék relatív sorrendje változatlan.
+ *  2. { ids: [movedId], beforeId | afterId } — egyetlen elem áthelyezése:
+ *     a húzott elem a beforeId ELÉ, bzw. az afterId UTÁN kerül a globális
+ *     sorrendben. Így 2. oldalon / lapozott nézetben is pontos a húzás, és
+ *     a kliens optimalista nézete mindig egyezik a szerverivel.
  */
-export function reorderProducts(ids: string[]): boolean {
+export function reorderProducts(
+  ids: string[],
+  target?: { beforeId?: string; afterId?: string }
+): boolean {
   const db = getDb();
   const unique = [...new Set(ids.filter((id) => typeof id === "string"))];
-  if (unique.length < 2) return false;
+  if (unique.length === 0) return false;
   const rows = db
     .prepare("SELECT id FROM products ORDER BY sort_order ASC, created_at DESC")
     .all() as unknown as Array<{ id: string }>;
   const allIds = rows.map((r) => r.id);
   const given = unique.filter((id) => allIds.includes(id));
-  if (given.length < 2) return false;
-  const givenSet = new Set(given);
-  const rest = allIds.filter((id) => !givenSet.has(id));
-  const newOrder = [...given, ...rest];
+  if (given.length === 0) return false;
+
+  // Új globális sorrend összeállítása.
+  let newOrder: string[];
+  const beforeId = target?.beforeId;
+  const afterId = target?.afterId;
+
+  if (beforeId !== undefined || afterId !== undefined) {
+    // Egyetlen elem áthelyezése (a többi termék sorrendje változatlan).
+    const [moved] = given;
+    if (moved === undefined) return false;
+    const rest = allIds.filter((id) => id !== moved);
+    let idx: number;
+    if (beforeId === "") {
+      // A lista legvégére húzás
+      idx = rest.length;
+    } else if (beforeId !== undefined) {
+      idx = rest.indexOf(beforeId);
+      if (idx < 0) return false;
+    } else if (afterId === "") {
+      idx = 0;
+    } else {
+      const at = rest.indexOf(afterId ?? "");
+      if (at < 0) return false;
+      idx = at + 1;
+    }
+    newOrder = [...rest.slice(0, idx), moved, ...rest.slice(idx)];
+  } else {
+    // Több elem (látóblokk) sorrendjének átírása a helyén.
+    const givenSet = new Set(given);
+    const rest = allIds.filter((id) => !givenSet.has(id));
+    newOrder = [...given, ...rest];
+  }
+
   const update = db.prepare("UPDATE products SET sort_order = ? WHERE id = ?");
   db.exec("BEGIN");
   try {

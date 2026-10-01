@@ -441,6 +441,8 @@ export default function ProductGallery({
                 onTagClick={toggleTag}
                 // Az első kártya az LCP-elem: a képe preload-olódik
                 priority={index === 0}
+                // Kiemelt (adminban jelölt) termékek narancssárga kerettel
+                highlight={!!product.featured}
               />
             ))}
           </div>

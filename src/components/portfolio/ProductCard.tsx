@@ -16,6 +16,9 @@ interface ProductCardProps {
   onTagClick?: (tag: string) => void;
   /** Az első (LCP) kártyán preload-olja a képet — csak az első elemre add meg. */
   priority?: boolean;
+  /** Narancssárga keretes kiemelés (kiemelt termék a portfólióban).
+   *  A főoldali kiemelt carousel NEM állítja be — ott marad a sima keret. */
+  highlight?: boolean;
 }
 
 export default function ProductCard({
@@ -24,6 +27,7 @@ export default function ProductCard({
   onToggleBookmark,
   onTagClick,
   priority = false,
+  highlight = false,
 }: ProductCardProps) {
   const [pulse, setPulse] = useState(false);
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,10 +62,14 @@ export default function ProductCard({
 
   return (
     <article
-      className={`group flex h-full flex-col overflow-hidden rounded-2xl border transition-colors ${
-        sold
-          ? "border-zinc-800/80 bg-zinc-900/20 hover:border-zinc-800"
-          : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700"
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border transition-colors ${
+        highlight
+          ? // Kiemelt termék: tartós, narancssárga (amber) keret + halvány
+            // narancssárga ragyogás; hoverre is ez marad a hungarocell.
+            "border-amber-500/70 bg-amber-950/10 shadow-[0_0_18px_rgba(245,158,11,0.12)] hover:border-amber-400"
+          : sold
+            ? "border-zinc-800/80 bg-zinc-900/20 hover:border-zinc-800"
+            : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700"
       }`}
     >
       <div className="relative aspect-[4/5] overflow-hidden">
@@ -172,7 +180,13 @@ export default function ProductCard({
         </button>
 
         {isNew && (
-          <span className="absolute left-3 top-3 z-10 rounded-full bg-amber-600 px-2.5 py-1 text-xs font-semibold text-zinc-950">
+          <span
+            className={`absolute left-3 top-3 z-10 rounded-full px-2.5 py-1 text-xs font-semibold ${
+              highlight
+                ? "bg-amber-500 text-zinc-950 ring-1 ring-zinc-950/40"
+                : "bg-amber-600 text-zinc-950"
+            }`}
+          >
             Új
           </span>
         )}

@@ -157,8 +157,9 @@ export function normalizeText(value: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-/** Az elmúlt N napban feltöltött termék kap "Új" jelzést */
-export function isNewProduct(product: Product, days = 60): boolean {
+/** Az elmúlt N napban feltöltött termék kap "Új" jelzést.
+ *  Alapértelmezés 14 nap (2 hét) — ennél régebbi feltöltés már nem "új". */
+export function isNewProduct(product: Product, days = 14): boolean {
   const ageMs = Date.now() - new Date(product.createdAt).getTime();
   return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
 }

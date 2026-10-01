@@ -166,8 +166,10 @@ export default function AdminProductTable({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  // A húzás csak az alap nézetben engedett (nincs szűrő/rendezés, 1. oldal),
-  // hogy a húzott blokk mindig a globális sorrend elején legyen.
+  // A húzás az alap nézetben engedett (nincs szűrő, 1. oldal, a táblázat-
+  // sorrend rendezés aktív). A beforeId/afterId protokollnak köszönhetően a
+  // húzás a tényleges pozíción hajtódik végre — nem kell a lista elejére
+  // korlátozni, így 2. oldalon is pontosan az történik, amit a felhasználó lát.
   const dragEnabled =
     page === 1 &&
     !filters.q?.trim() &&
@@ -179,12 +181,18 @@ export default function AdminProductTable({
     filters.maxPrice === undefined &&
     (filters.sort === undefined || filters.sort === "sortOrder");
 
-  const persistOrder = async (ids: string[]) => {
+  /** A sorrend mentése. Egyetlen elem húzásánál a célsort (beforeId/afterId)
+   *  is elküldjük, hogy a szerver a tényleges pozíción hajtsa végre a
+   *  módosítást (2. oldalon / szűrt nézetben is pontos legyen). */
+  const persistOrder = async (
+    ids: string[],
+    target?: { beforeId?: string; afterId?: string }
+  ) => {
     try {
       const res = await fetch("/api/admin/products/reorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify(target ? { ids, ...target } : { ids }),
       });
       if (!res.ok) throw new Error("reorder failed");
       router.refresh();
@@ -220,7 +228,12 @@ export default function AdminProductTable({
         .map((id) => localProducts.find((p) => p.id === id))
         .filter((p): p is Product => p !== undefined)
     );
-    await persistOrder(nextIds);
+    // A szervernek azt mondjuk meg, hogy a húzott elem a célsor ELÉ vagy
+    // UTÁN kerüljön — aszerint, honnan húztuk (felfelé → elé, lefelé → után).
+    // Így az optimalista UI és a szerveri sorrend minden nézetben egyezik.
+    await persistOrder([fromId],
+      from < to ? { afterId: targetId } : { beforeId: targetId }
+    );
   };
 
   // Helyi piszkozatok a szöveges/érték mezőkhöz — a navigáció (Enter) után
