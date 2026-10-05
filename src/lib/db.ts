@@ -9,6 +9,7 @@ import type {
   ProductDetail,
 } from "@/types/product";
 import type { FeedEntryFields } from "./feed";
+import { DEFAULT_MAINTENANCE_MESSAGE } from "./maintenance";
 
 // Ezt a modult KIZÁRÓLAG szerver-komponensek importálhatják —
 // a kliens komponensek kész, szerializált objektumokat kapnak propokként.
@@ -257,6 +258,17 @@ const BLOG_POST_TAGS_SCHEMA = `
   )
 `;
 
+// Globális oldal-beállítások: egyetlen sor (id = 1) tartalmazza a
+// karbantartás mód állapotát és a látogatóknak megjelenő tájékoztató szöveget.
+const SITE_SETTINGS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS site_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    maintenance_enabled INTEGER NOT NULL DEFAULT 0,
+    maintenance_message TEXT NOT NULL DEFAULT '',
+    updated_at TEXT
+  )
+`;
+
 const UPSERT_FEED_SQL = `
   INSERT INTO feed_entries (
     product_id, feed_id, title, description, availability, condition, price,
@@ -387,6 +399,7 @@ function getDb(): DatabaseSync {
   db.exec(BLOG_POSTS_SCHEMA);
   db.exec(BLOG_KEYWORDS_SCHEMA);
   db.exec(BLOG_POST_TAGS_SCHEMA);
+  db.exec(SITE_SETTINGS_SCHEMA);
   // Blog táblák kiterjesztése a szinkron-állapot és a translated zászló oszlopokkal
   try {
     const sourceCols = db
@@ -2289,3 +2302,44 @@ export function countPostsMissingImages(): number {
 }
 
 export { uniqueSlug, touchBlogSource };
+
+/** A karbantartás mód aktuális állapota (a teljes site_settings sor). */
+export function getMaintenance(): {
+  enabled: boolean;
+  message: string;
+  updatedAt: string | null;
+} {
+  const row = getDb()
+    .prepare(
+      "SELECT maintenance_enabled, maintenance_message, updated_at FROM site_settings WHERE id = 1"
+    )
+    .get() as
+    | { maintenance_enabled: number; maintenance_message: string; updated_at: string | null }
+    | undefined;
+  return {
+    enabled: row?.maintenance_enabled === 1,
+    message:
+      row?.maintenance_message && row.maintenance_message.trim() !== ""
+        ? row.maintenance_message
+        : DEFAULT_MAINTENANCE_MESSAGE,
+    updatedAt: row?.updated_at ?? null,
+  };
+}
+
+/**
+ * Karbantartás mód be-/kikapcsolása és a tájékoztató szöveg mentése.
+ * Az üres szöveg az alapértelmezett üzenetet eredményezi.
+ */
+export function setMaintenance(enabled: boolean, message: string): void {
+  const clean = typeof message === "string" ? message.trim() : "";
+  getDb()
+    .prepare(
+      `INSERT INTO site_settings (id, maintenance_enabled, maintenance_message, updated_at)
+       VALUES (1, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         maintenance_enabled = excluded.maintenance_enabled,
+         maintenance_message = excluded.maintenance_message,
+         updated_at = excluded.updated_at`
+    )
+    .run(enabled ? 1 : 0, clean, new Date().toISOString());
+}

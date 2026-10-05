@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { readMaintenance } from "@/lib/maintenance";
 
 // Fallback Basic Auth — a .env.local-ból jön (ADMIN_USERNAME / ADMIN_PASSWORD)
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "";
@@ -39,12 +40,48 @@ function isGoogleSessionValid(req: { auth?: { user?: { email?: string | null } }
   return getAllowedEmails().has(email);
 }
 
-// Auth.js wrapper — a req.auth már tartalmazza a Google session-t (JWT)
+// Auth.js wrapper — a req.auth már tartalmazza a Google session-t (JWT).
+// Fontos: az auth() önmagában NEM zár ki semmit — a védelem az alábbi
+// explicit ellenőrzésekből áll, és CSAK az /admin* útvonalakra vonatkozik.
 export default auth((req) => {
   const pathname = req.nextUrl.pathname;
+  const isAdminRoute =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/api/admin" ||
+    pathname.startsWith("/api/admin/");
+
+  // 1) KARBANTARTÁS MÓD — csak a NEM admin kérésekre.
+  //    Ha be van kapcsolva, a nyilvános oldalak helyett a tájékoztató oldal
+  //    jelenik meg (rewrite — a böngészőben marad az eredeti URL). A
+  //    bejelentkezett admin előnézetben továbbra is a valódi oldalt látja.
+  if (
+    !isAdminRoute &&
+    readMaintenance().enabled &&
+    !isGoogleSessionValid(req) &&
+    !isBasicAuthValid(req)
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        {
+          error:
+            "Az oldal karbantartás módban van — a kérések átmenetileg nem engedélyezettek.",
+        },
+        { status: 503 }
+      );
+    }
+    return NextResponse.rewrite(new URL("/karbantartas", req.url));
+  }
+
+  // 2) Nem admin kérés (nyilvános oldal): tovább a normál renderelésre.
+  if (!isAdminRoute) {
+    return NextResponse.next();
+  }
+
+  // --- Innentől kizárólag /admin* és /api/admin* kérések ---
 
   // A login oldal és az Auth.js végpontok ne legyenek védve
-  if (pathname.startsWith("/admin/login") || pathname.startsWith("/api/auth")) {
+  if (pathname.startsWith("/admin/login")) {
     return NextResponse.next();
   }
 
@@ -99,6 +136,11 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Az admin oldalak és az admin API útvonalak védve (a login kivételével — azt a middleware engedi)
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  // Minden útvonal, KIVÉVE: statikus eszközök, maga a /karbantartas oldal,
+  // az Auth.js végpontok, a nyilvános űrlap-/referral-/fájl-API-k, a cron
+  // végpont, a SEO-fájlok és a termék XML feed. (Az admin útvonalak bent
+  // maradnak: karbantartás közben is védettek, és az admin előnézetet kap.)
+  matcher: [
+    "/((?!_next/static|_next/image|karbantartas|api/auth|api/contact|api/offers|api/purchase|api/newsletter|api/referral|api/files|api/cron|favicon.ico|robots.txt|sitemap.xml|feed/products.xml|icon.svg|images/).*)",
+  ],
 };

@@ -11,6 +11,7 @@ import {
   Rss,
   Settings,
   Ticket,
+  Wrench,
 } from "lucide-react";
 import {
   getCategoryOptions,
@@ -29,6 +30,7 @@ import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminCurrentProject from "@/components/admin/AdminCurrentProject";
 import AdminBlog from "@/components/admin/AdminBlog";
 import AdminEnv from "@/components/admin/AdminEnv";
+import AdminMaintenance from "@/components/admin/AdminMaintenance";
 import { auth, signOut } from "@/auth";
 
 export const metadata: Metadata = {
@@ -51,6 +53,7 @@ export default async function AdminPage({
     tabRaw === "coupons" ||
     tabRaw === "current" ||
     tabRaw === "blog" ||
+    tabRaw === "maintenance" ||
     tabRaw === "env"
       ? tabRaw
       : "products";
@@ -232,6 +235,17 @@ export default async function AdminPage({
               Blog
             </Link>
             <Link
+              href="/admin?tab=maintenance"
+              className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
+                tab === "maintenance"
+                  ? "border-amber-500 text-amber-500"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Karbantartás
+            </Link>
+            <Link
               href="/admin?tab=env"
               className={`inline-flex h-12 items-center gap-2 border-b-2 px-4 text-sm font-medium transition-colors ${
                 tab === "env"
@@ -290,6 +304,16 @@ export default async function AdminPage({
               weboldal blogjában.
             </p>
             <AdminBlog />
+          </>
+        ) : tab === "maintenance" ? (
+          <>
+            <h2 className="text-lg font-semibold text-zinc-100">Karbantartás mód</h2>
+            <p className="mt-1 mb-6 text-sm text-zinc-500">
+              Bekapcsoláskor a weboldal összes nyilvános oldala helyett egy
+              tájékoztató szöveg jelenik meg — amit itt szerkeszthetsz. Az admin
+              felület és a bejelentkezett admin (előnézet) elérhető marad.
+            </p>
+            <AdminMaintenance />
           </>
         ) : tab === "env" ? (
           <>
