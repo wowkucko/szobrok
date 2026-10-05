@@ -10,6 +10,7 @@ import type {
 } from "@/types/product";
 import type { FeedEntryFields } from "./feed";
 import { DEFAULT_MAINTENANCE_MESSAGE } from "./maintenance";
+import { slugify, slugValidationError } from "./slug";
 
 // Ezt a modult KIZÁRÓLAG szerver-komponensek importálhatják —
 // a kliens komponensek kész, szerializált objektumokat kapnak propokként.
@@ -35,6 +36,7 @@ interface ProductRow {
   images: string;
   thumbnail: string;
   created_at: string;
+  updated_at: string | null;
   is_available: number;
   featured: number;
   is_shippable: number;
@@ -84,8 +86,8 @@ const INSERT_SQL = `
     detail_scale, tags, category, images, thumbnail, created_at,
     is_available, featured, is_shippable, description_html, video_url,
     materials, print_technology, width_cm, depth_cm, scale_comparison,
-    external_shop_url, gallery_images, sort_order
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    external_shop_url, gallery_images, sort_order, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
 const SCHEMA = `
@@ -260,6 +262,16 @@ const BLOG_POST_TAGS_SCHEMA = `
 
 // Globális oldal-beállítások: egyetlen sor (id = 1) tartalmazza a
 // karbantartás mód állapotát és a látogatóknak megjelenő tájékoztató szöveget.
+// Régi (átnevezett) termék-webcímek: a régi URL-ről az aktuálisra irányítunk,
+// így a korábban megosztott linkek és a Google találatai sem vesznek el.
+const PRODUCT_SLUG_REDIRECTS_SCHEMA = `
+  CREATE TABLE IF NOT EXISTS product_slug_redirects (
+    old_slug TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`;
+
 const SITE_SETTINGS_SCHEMA = `
   CREATE TABLE IF NOT EXISTS site_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -400,6 +412,7 @@ function getDb(): DatabaseSync {
   db.exec(BLOG_KEYWORDS_SCHEMA);
   db.exec(BLOG_POST_TAGS_SCHEMA);
   db.exec(SITE_SETTINGS_SCHEMA);
+  db.exec(PRODUCT_SLUG_REDIRECTS_SCHEMA);
   // Blog táblák kiterjesztése a szinkron-állapot és a translated zászló oszlopokkal
   try {
     const sourceCols = db
@@ -475,6 +488,13 @@ function getDb(): DatabaseSync {
       .all() as unknown as Array<{ id: string }>;
     const setOrder = db.prepare("UPDATE products SET sort_order = ? WHERE id = ?");
     rows.forEach((row, index) => setOrder.run(index, row.id));
+  }
+  // A termék utolsó módosításának ideje. Ez kerül a sitemap lastmod mezőjébe,
+  // amiből a Google látja, hogy az oldal tartalma megváltozott.
+  try {
+    db.exec("ALTER TABLE products ADD COLUMN updated_at TEXT");
+  } catch {
+    // már létezik az oszlop — minden rendben
   }
   // Első indításkor (ha még üres) automatikusan feltöltjük a JSON adatokból
   const { count } = db
@@ -611,20 +631,10 @@ function seedFromJson(target: DatabaseSync): void {
       d.scaleComparisonObject,
       SHOP_URL,
       "[]",
-      index
+      index,
+      p.createdAt
     );
   });
-}
-
-/** Címből generált URL-kulcs (pl. "Sárkány Úr" -> "sarkany-ur"). */
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
 }
 
 /** Egyedi, ütközésmentes id generálása (termek, termek-2, termek-3 ...). */
@@ -637,10 +647,18 @@ function uniqueId(target: DatabaseSync, base: string): string {
   return `${base}-${n}`;
 }
 
-/** Új termék felvétele. Visszaadja a generált id-t. */
-export function createProduct(input: ProductInput): { id: string } {
+/**
+ * Új termék felvétele. Visszaadja a generált id-t.
+ * A `requestedSlug` a felületről megadott webcím; ha üres vagy már foglalt,
+ * a címből képzett kulcsot használjuk (ütközésnél -2, -3 … utótaggal).
+ */
+export function createProduct(
+  input: ProductInput,
+  requestedSlug?: string
+): { id: string } {
   const target = getDb();
-  const id = uniqueId(target, slugify(input.title) || "termek");
+  const wanted = slugify(requestedSlug?.trim() || input.title) || "termek";
+  const id = uniqueId(target, wanted);
   // Az új termék a saját sorrend VÉGÉRE kerül (a portfólió/kiemeltek aljára).
   const { max } = target
     .prepare("SELECT COALESCE(MAX(sort_order), -1) AS max FROM products")
@@ -674,8 +692,12 @@ export function createProduct(input: ProductInput): { id: string } {
       input.scaleComparisonObject,
       input.externalShopUrl,
       "[]",
-      max + 1
+      max + 1,
+      new Date().toISOString()
     );
+  // Ha ez a cím korábban egy átnevezett termékre irányított, az átirányítás
+  // törlődik: a cím mostantól közvetlenül létezik.
+  target.prepare("DELETE FROM product_slug_redirects WHERE old_slug = ?").run(id);
   return { id };
 }
 
@@ -689,7 +711,7 @@ export function updateProduct(id: string, input: ProductInput): boolean {
         images = ?, thumbnail = ?, created_at = ?, is_available = ?,
         featured = ?, is_shippable = ?, description_html = ?, video_url = ?,
         materials = ?, print_technology = ?, width_cm = ?, depth_cm = ?,
-        scale_comparison = ?, external_shop_url = ?
+        scale_comparison = ?, external_shop_url = ?, updated_at = ?
       WHERE id = ?
     `)
     .run(
@@ -717,6 +739,7 @@ export function updateProduct(id: string, input: ProductInput): boolean {
       input.depthCm,
       input.scaleComparisonObject,
       input.externalShopUrl,
+      new Date().toISOString(),
       id
     );
   return (result as { changes: number }).changes > 0;
@@ -725,8 +748,8 @@ export function updateProduct(id: string, input: ProductInput): boolean {
 /** Termék árának gyors frissítése (admin lista). */
 export function updateProductPrice(id: string, price: number): boolean {
   const result = getDb()
-    .prepare("UPDATE products SET price = ? WHERE id = ?")
-    .run(price, id);
+    .prepare("UPDATE products SET price = ?, updated_at = ? WHERE id = ?")
+    .run(price, new Date().toISOString(), id);
   return (result as { changes: number }).changes > 0;
 }
 
@@ -734,7 +757,143 @@ export function updateProductPrice(id: string, price: number): boolean {
 export function deleteProduct(id: string): boolean {
   const result = getDb().prepare("DELETE FROM products WHERE id = ?").run(id);
   getDb().prepare("DELETE FROM feed_entries WHERE product_id = ?").run(id);
+  // A termékre mutató régi webcímek is törlődnek (nem irányítunk sehova).
+  getDb()
+    .prepare("DELETE FROM product_slug_redirects WHERE product_id = ?")
+    .run(id);
   return (result as { changes: number }).changes > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Webcím (URL slug) — átnevezés és régi címek átirányítása
+
+/** Szabad-e a megadott webcím (az `exceptId` a saját maga kivétele). */
+export function isSlugAvailable(slug: string, exceptId?: string): boolean {
+  if (exceptId && slug === exceptId) return true;
+  const row = getDb()
+    .prepare("SELECT id FROM products WHERE id = ?")
+    .get(slug) as unknown as { id: string } | undefined;
+  return row === undefined;
+}
+
+/** Az átnevezés eredménye: `error` csak hiba esetén van kitöltve. */
+export interface RenameSlugResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * A termék webcímének (egyben az id-jének) átnevezése.
+ *
+ * Mivel a nyilvános URL a termék id-jéből épül (`/portfolio/<id>`), az
+ * átnevezés magát az id-t írja át — így a portfólió, a sitemap, a feed és a
+ * JSON-LD mindenhol automatikusan az új címre mutat.
+ *
+ * A régi cím bekerül a `product_slug_redirects` táblába, ahonnan a
+ * `/portfolio/<régi-cím>` kérés 308-cal az új címre irányít. A korábbi
+ * átirányítások láncolódnak (a → b, majd b → c esetén a → c).
+ */
+export function renameProductSlug(
+  oldId: string,
+  newSlug: string
+): RenameSlugResult {
+  if (oldId === newSlug) return { ok: true };
+  const invalid = slugValidationError(newSlug);
+  if (invalid) return { ok: false, error: invalid };
+  if (!isSlugAvailable(newSlug, oldId)) {
+    return {
+      ok: false,
+      error: `Ez a webcím már használatban van: /portfolio/${newSlug}`,
+    };
+  }
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.exec("BEGIN");
+  try {
+    db.prepare(
+      "UPDATE products SET id = ?, slug = ?, updated_at = ? WHERE id = ?"
+    ).run(newSlug, newSlug, now, oldId);
+    // A termékre hivatkozó sorok átköltöztetése (feed-bejegyzés, üzenetek).
+    db.prepare(
+      "UPDATE feed_entries SET product_id = ? WHERE product_id = ?"
+    ).run(newSlug, oldId);
+    db.prepare("UPDATE messages SET product_id = ? WHERE product_id = ?").run(
+      newSlug,
+      oldId
+    );
+    // A korábbi átirányítások láncolása az új címre.
+    db.prepare(
+      "UPDATE product_slug_redirects SET product_id = ? WHERE product_id = ?"
+    ).run(newSlug, oldId);
+    // Ha az új cím korábban egy átnevezett termék régi címe volt, az a sor
+    // törlődik — a cím mostantól közvetlenül erre a termékre mutat.
+    db.prepare("DELETE FROM product_slug_redirects WHERE old_slug = ?").run(
+      newSlug
+    );
+    // A régi cím mostantól ide irányít.
+    db.prepare(
+      `INSERT OR REPLACE INTO product_slug_redirects (old_slug, product_id, created_at)
+       VALUES (?, ?, ?)`
+    ).run(oldId, newSlug, now);
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return { ok: true };
+}
+
+/**
+ * Egy régi (átnevezett) webcím feloldása a termék aktuális id-jára.
+ * null, ha nincs ilyen átirányítás, vagy ha a célterméket időközben törölték.
+ */
+export function resolveProductSlug(oldSlug: string): string | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT product_id FROM product_slug_redirects WHERE old_slug = ?")
+    .get(oldSlug) as unknown as { product_id: string } | undefined;
+  if (!row) return null;
+  const target = db
+    .prepare("SELECT 1 AS ok FROM products WHERE id = ?")
+    .get(row.product_id) as unknown as { ok: number } | undefined;
+  return target ? row.product_id : null;
+}
+
+/**
+ * Azok a régi webcímek, amik erre a termékre irányítanak — az átnevezések
+ * teljes láncolata. Átnevezéskor ezeket a régi útvonalakat is újra kell
+ * generálni, különben a gyorsítótárban maradt 308-asok egymásra láncolódnak.
+ */
+export function listRedirectSources(productId: string): string[] {
+  const rows = getDb()
+    .prepare(
+      "SELECT old_slug FROM product_slug_redirects WHERE product_id = ? ORDER BY created_at"
+    )
+    .all(productId) as unknown as Array<{ old_slug: string }>;
+  return rows.map((r) => r.old_slug);
+}
+
+/** Az összes élő webcím-átirányítás (admin áttekintéshez / teszteléshez). */
+export function listSlugRedirects(): Array<{
+  oldSlug: string;
+  productId: string;
+  createdAt: string;
+}> {
+  const rows = getDb()
+    .prepare(
+      "SELECT old_slug, product_id, created_at FROM product_slug_redirects ORDER BY created_at DESC"
+    )
+    .all() as unknown as Array<{
+    old_slug: string;
+    product_id: string;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    oldSlug: r.old_slug,
+    productId: r.product_id,
+    createdAt: r.created_at,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -832,6 +991,7 @@ function rowToProduct(r: ProductRow): Product {
     images: JSON.parse(r.images) as string[],
     thumbnail: r.thumbnail || (JSON.parse(r.images) as string[])[0] || undefined,
     createdAt: r.created_at,
+    updatedAt: r.updated_at ?? undefined,
     isAvailable: r.is_available === 1,
     featured: r.featured === 1,
     isShippable: r.is_shippable === 1,
@@ -1092,8 +1252,8 @@ export function updateProductFlag(
 ): boolean {
   const column = field; // whitelist: csak a két engedélyezett oszlopnév
   const result = getDb()
-    .prepare(`UPDATE products SET ${column} = ? WHERE id = ?`)
-    .run(value ? 1 : 0, id);
+    .prepare(`UPDATE products SET ${column} = ?, updated_at = ? WHERE id = ?`)
+    .run(value ? 1 : 0, new Date().toISOString(), id);
   return (result as { changes: number }).changes > 0;
 }
 

@@ -7,14 +7,17 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Link2,
   Loader2,
   Plus,
   Ruler,
   Save,
+  Sparkles,
   Tag as TagIcon,
   X,
 } from "lucide-react";
 import type { ProductDetail } from "@/types/product";
+import { slugify, slugValidationError } from "@/lib/slug";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import ImageListField from "@/components/admin/ImageListField";
 import CategoryCombobox from "@/components/admin/CategoryCombobox";
@@ -29,6 +32,7 @@ interface ProductFormProps {
 
 interface FormValues {
   title: string;
+  slug: string;
   shortDescription: string;
   price: string;
   currency: string;
@@ -97,11 +101,14 @@ export default function ProductForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customTag, setCustomTag] = useState("");
+  // Amíg a webcímet nem írták kézzel, új terméknél a címből generáljuk.
+  const [slugTouched, setSlugTouched] = useState(false);
 
   const [values, setValues] = useState<FormValues>(() =>
     product
       ? {
           title: product.title,
+          slug: product.slug || product.id,
           shortDescription: product.shortDescription,
           price: String(product.price),
           currency: product.currency,
@@ -124,6 +131,7 @@ export default function ProductForm({
         }
       : {
           title: "",
+          slug: "",
           shortDescription: "",
           price: "",
           currency: "HUF",
@@ -148,6 +156,21 @@ export default function ProductForm({
 
   const update = <K extends keyof FormValues,>(key: K, value: FormValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
+
+  /** Cím módosítása — új terméknél a webcím is vele együtt generálódik,
+   *  amíg azt kézzel át nem írták. */
+  const updateTitle = (title: string) =>
+    setValues((v) => ({
+      ...v,
+      title,
+      slug: mode === "create" && !slugTouched ? slugify(title) : v.slug,
+    }));
+
+  /** A webcím újragenerálása a címből (ékezetek és szóközök nélkül). */
+  const generateSlug = () => {
+    setSlugTouched(true);
+    update("slug", slugify(values.title));
+  };
 
   /** Magasság módosítása + méretarány automatikus újraszámítása. */
   const updateHeight = (height: string) =>
@@ -223,6 +246,14 @@ export default function ProductForm({
       setError("A cím kötelező.");
       return;
     }
+    const slug = values.slug.trim();
+    if (slug) {
+      const slugErr = slugValidationError(slug);
+      if (slugErr) {
+        setError(slugErr);
+        return;
+      }
+    }
     const price = Number(values.price);
     if (!Number.isFinite(price) || price < 0) {
       setError("Az árnak érvényes, nemnegatív számnak kell lennie.");
@@ -233,6 +264,8 @@ export default function ProductForm({
     try {
       const payload = {
         title: values.title.trim(),
+        // A webcím: átnevezésnél a régi cím 308-cal az újra irányít.
+        slug,
         shortDescription: values.shortDescription.trim(),
         price,
         currency: values.currency,
@@ -277,6 +310,13 @@ export default function ProductForm({
     }
   };
 
+  // Élő webcím-ellenőrzés — a hibát már gépelés közben jelezzük.
+  const slugValue = values.slug.trim();
+  const slugError = slugValue ? slugValidationError(slugValue) : null;
+  const currentSlug = product?.slug ?? product?.id ?? "";
+  const slugChanged =
+    mode === "edit" && slugValue !== "" && slugValue !== currentSlug;
+
   const materialOptions = [
     ...MATERIAL_OPTIONS,
     ...values.materials.filter((m) => !MATERIAL_OPTIONS.includes(m)),
@@ -296,11 +336,72 @@ export default function ProductForm({
           <Field label="Cím *" className="sm:col-span-2">
             <TextInput
               value={values.title}
-              onChange={(v) => update("title", v)}
+              onChange={updateTitle}
               placeholder="pl. Nekomata Kunoichi — Kézzel festett műgyanta bust"
               required
             />
           </Field>
+
+          {/* URL webcím: ez lesz a termék nyilvános címe. Átnevezésnél a régi
+              cím 308-cal az újra irányít, és a keresők is jelzést kapnak. */}
+          <div className="sm:col-span-2">
+            <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-zinc-400">
+              <Link2 className="h-3.5 w-3.5" />
+              URL webcím (slug)
+            </span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div
+                className={`flex h-10 min-w-0 flex-1 items-center overflow-hidden rounded-lg border bg-zinc-950/60 focus-within:border-amber-600/60 ${
+                  slugError ? "border-red-600/60" : "border-zinc-800"
+                }`}
+              >
+                <span className="h-full shrink-0 select-none border-r border-zinc-800 bg-zinc-900/60 px-3 text-sm leading-10 text-zinc-500">
+                  /portfolio/
+                </span>
+                <input
+                  value={values.slug}
+                  onChange={(e) => {
+                    setSlugTouched(true);
+                    update("slug", e.target.value);
+                  }}
+                  placeholder={
+                    mode === "create"
+                      ? slugify(values.title) || "pl. nekomata-kunoichi"
+                      : "(a jelenlegi cím marad)"
+                  }
+                  aria-label="URL webcím"
+                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={generateSlug}
+                title="Webcím generálása a címből"
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-amber-600/70 hover:text-amber-500"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Címből
+              </button>
+            </div>
+
+            {slugError ? (
+              <span className="mt-1.5 block text-xs text-red-400">
+                {slugError}
+              </span>
+            ) : slugChanged ? (
+              <span className="mt-1.5 block text-xs text-amber-500">
+                Átnevezés: /portfolio/{values.slug.trim()} — a régi linkek
+                automatikusan ide irányítanak (308), és a keresők jelzést
+                kapnak a változásról.
+              </span>
+            ) : (
+              <span className="mt-1.5 block text-xs text-zinc-600">
+                A termék nyilvános címe. Átnevezésnél a korábban megosztott
+                linkek is az új címre irányítanak, és a Google/Bing gyorsabban
+                értesül a változásról.
+              </span>
+            )}
+          </div>
 
           <div>
             <span className="mb-1.5 block text-xs font-medium text-zinc-400">

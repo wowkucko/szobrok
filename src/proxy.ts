@@ -138,9 +138,10 @@ export default auth((req) => {
 export const config = {
   // Minden útvonal, KIVÉVE: statikus eszközök, maga a /karbantartas oldal,
   // az Auth.js végpontok, a nyilvános űrlap-/referral-/fájl-API-k, a cron
-  // végpont, a SEO-fájlok és a termék XML feed. (Az admin útvonalak bent
-  // maradnak: karbantartás közben is védettek, és az admin előnézetet kap.)
+  // végpont, az IndexNow kulcs-fájl, a SEO-fájlok és a termék XML feed.
+  // (Az admin útvonalak bent maradnak: karbantartás közben is védettek, és az
+  // admin előnézetet kap.)
   matcher: [
-    "/((?!_next/static|_next/image|karbantartas|api/auth|api/contact|api/offers|api/purchase|api/newsletter|api/referral|api/files|api/cron|favicon.ico|robots.txt|sitemap.xml|feed/products.xml|icon.svg|images/).*)",
+    "/((?!_next/static|_next/image|karbantartas|api/auth|api/contact|api/offers|api/purchase|api/newsletter|api/referral|api/files|api/indexnow|api/cron|favicon.ico|robots.txt|sitemap.xml|feed/products.xml|icon.svg|images/).*)",
   ],
 };

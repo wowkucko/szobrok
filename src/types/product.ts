@@ -23,6 +23,8 @@ export interface Product {
   /** A bélyegképként megjelölt kép URL-je; ha üres, az images[0] a bélyegkép. */
   thumbnail?: string;
   createdAt: string; // ISO dátum a rendezéshez
+  /** Utolsó módosítás ISO dátuma — a sitemap lastmod mezője (Google jelzés). */
+  updatedAt?: string;
   isAvailable: boolean;
   featured?: boolean; // kiemelt a főoldalon
   /** Biztonságosan szállítható (pl. csomagautomatába). */

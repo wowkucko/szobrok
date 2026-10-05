@@ -5,6 +5,10 @@ import { SITE_URL, absoluteUrl, ogImageFor } from "@/lib/seo";
 // Google kép-sitemap: URL-enként legfeljebb ennyi kép (bélyegkép + továbbiak).
 const MAX_IMAGES_PER_PRODUCT = 5;
 
+// Biztonsági háló: a termék mentésekor a revalidatePath("/sitemap.xml")
+// azonnal frissíti a sitemapot, de legfeljebb 5 percenként magától is.
+export const revalidate = 300;
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const products = getProducts();
 
@@ -36,7 +40,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     return {
       url: `${SITE_URL}/portfolio/${p.id}`,
-      lastModified: new Date(p.createdAt),
+      // A valódi módosítás ideje — a Google ebből látja, hogy az oldal
+      // tartalma megváltozott, és mikor érdemes újraolvasnia.
+      lastModified: new Date(p.updatedAt ?? p.createdAt),
       changeFrequency: "weekly" as const,
       priority: p.isAvailable ? 0.8 : 0.5,
       images,

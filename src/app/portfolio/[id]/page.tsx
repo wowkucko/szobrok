@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -33,6 +33,7 @@ import {
   getProductById,
   getProducts,
   getRelatedProducts,
+  resolveProductSlug,
 } from "@/lib/db";
 import { formatPrice } from "@/lib/products";
 import {
@@ -89,7 +90,13 @@ const MATERIAL_ICONS = [FlaskConical, Palette, ShieldCheck, Puzzle];
 export default async function ProductDetailPage({ params }: Props) {
   const { id } = await params;
   const product = getProductById(id);
-  if (!product) notFound();
+  // Átnevezett termék: a régi webcím 308-cal (véglegesen) az újra irányít,
+  // így a korábban megosztott linkek és a Google találatai sem vesznek el.
+  if (!product) {
+    const current = resolveProductSlug(id);
+    if (current) permanentRedirect(`/portfolio/${current}`);
+    notFound();
+  }
 
   const related = getRelatedProducts(product, 4);
 

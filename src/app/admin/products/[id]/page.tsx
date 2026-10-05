@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
 import ProductForm from "@/components/admin/ProductForm";
 import {
   getCategoryOptions,
@@ -42,9 +42,17 @@ export default async function EditProductPage({
             <Pencil className="h-7 w-7 text-amber-500" />
             Termék szerkesztése
           </h1>
-          <p className="mt-3 text-sm text-zinc-400">
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
             <span className="text-zinc-300">{product.title}</span>
-            <span className="ml-2 text-zinc-600">(id: {product.id})</span>
+            <a
+              href={`/portfolio/${product.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-mono text-xs text-amber-500/90 transition-colors hover:text-amber-400"
+            >
+              /portfolio/{product.id}
+              <ExternalLink className="h-3 w-3" />
+            </a>
           </p>
         </div>
       </header>

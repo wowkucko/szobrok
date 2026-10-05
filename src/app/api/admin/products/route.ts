@@ -1,16 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import {
   createProduct,
   deleteProduct,
+  isSlugAvailable,
+  listRedirectSources,
   parseProductQuery,
   queryProducts,
+  renameProductSlug,
   updateProduct,
   updateProductFlag,
   updateProductPrice,
   type ProductInput,
 } from "@/lib/db";
+import { notifyIndexNow } from "@/lib/indexing";
 import { refreshCollageForProduct } from "@/lib/ogCollage";
+import { SITE_URL } from "@/lib/seo";
+import { slugValidationError } from "@/lib/slug";
 import type { PrintTechnology } from "@/types/product";
 
 const TECHNOLOGIES: PrintTechnology[] = ["MSLA Resin (12K)", "FDM (0.08 mm)"];
@@ -75,12 +81,26 @@ function titleError(input: ProductInput): string | null {
   return null;
 }
 
-/** A módosítások azonnal megjelenjenek a nyilvános oldalakon (cache újragenerálás). */
-function invalidatePublicCache(productId?: string) {
+/** A termék nyilvános URL-je a webcíméből (a webcím az id-vel azonos). */
+function productUrl(slug: string): string {
+  return `${SITE_URL}/portfolio/${slug}`;
+}
+
+/**
+ * A módosítások azonnal megjelenjenek a nyilvános oldalakon (cache
+ * újragenerálás). Átnevezésnél a régi és az új cím is újragenerálódik: a régi
+ * útvonalon ugyanis a 308-as átirányítást kell kiszolgálni.
+ */
+function invalidatePublicCache(...productIds: string[]) {
   revalidatePath("/");
   revalidatePath("/portfolio");
   revalidatePath("/feed/products.xml");
-  if (productId) revalidatePath(`/portfolio/${productId}`);
+  // A sitemap lastmod mezője a termék updated_at-jából jön — ez a Google
+  // felé menő jelzés, ezért azt is frissíteni kell.
+  revalidatePath("/sitemap.xml");
+  for (const id of productIds) {
+    if (id) revalidatePath(`/portfolio/${id}`);
+  }
 }
 
 /**
@@ -106,16 +126,34 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ products, total, filtered, page, pageCount, filters });
 }
 
-/** Új termék létrehozása. */
+/** Új termék létrehozása. A `slug` megadható; ha üres, a címből képződik. */
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
+  const body = (await request.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
   const input = parseInput(body);
   const err = titleError(input);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
-  const { id } = createProduct(input);
+
+  const slugRaw = str(body?.slug).trim();
+  if (slugRaw) {
+    const slugErr = slugValidationError(slugRaw);
+    if (slugErr) return NextResponse.json({ error: slugErr }, { status: 400 });
+    if (!isSlugAvailable(slugRaw)) {
+      return NextResponse.json(
+        { error: `Ez a webcím már használatban van: /portfolio/${slugRaw}` },
+        { status: 400 }
+      );
+    }
+  }
+
+  const { id } = createProduct(input, slugRaw || undefined);
   invalidatePublicCache(id);
   await refreshCollage(id);
-  return NextResponse.json({ ok: true, id });
+  // Új oldal: azonnali jelzés a keresőknek (IndexNow).
+  after(() => notifyIndexNow([productUrl(id)]));
+  return NextResponse.json({ ok: true, id, slug: id });
 }
 
 /** Termék frissítése: { id, ...mezők } vagy a régi flag-toggle formátum ({ id, field, value }). */
@@ -154,13 +192,47 @@ export async function PATCH(request: NextRequest) {
   const input = parseInput(body);
   const err = titleError(input);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
-  const updated = updateProduct(body.id, input);
+
+  // Webcím (slug) átnevezés: a régi cím 308-cal az újra irányít, és a
+  // keresők is azonnal jelzést kapnak (sitemap lastmod + IndexNow).
+  const oldId = body.id;
+  const slugRaw = str(body.slug).trim();
+  const renaming = slugRaw !== "" && slugRaw !== oldId;
+  if (renaming) {
+    const result = renameProductSlug(oldId, slugRaw);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: result.error ?? "A webcím átnevezése nem sikerült." },
+        { status: 400 }
+      );
+    }
+  }
+  const productId = renaming ? slugRaw : oldId;
+
+  const updated = updateProduct(productId, input);
   if (!updated) {
     return NextResponse.json({ error: "Nincs ilyen termék" }, { status: 404 });
   }
-  invalidatePublicCache(body.id);
-  await refreshCollage(body.id);
-  return NextResponse.json({ ok: true });
+
+  if (renaming) {
+    // A régi cím MELLETT minden korábbi generáció is újragenerálódik, hogy
+    // azonnal (és egyetlen lépésben) az új címre irányítsanak — így nem
+    // láncolódnak a 308-asok a gyorsítótárban.
+    const oldSlugs = listRedirectSources(productId);
+    invalidatePublicCache(oldId, productId, ...oldSlugs);
+    // A jelzésbe az összes érintett cím bekerül: a régiről a Google is át
+    // tudja venni az átirányítást, az új pedig azonnal indexelhető.
+    after(() =>
+      notifyIndexNow(
+        [...new Set([productId, oldId, ...oldSlugs])].map(productUrl)
+      )
+    );
+  } else {
+    invalidatePublicCache(productId);
+    after(() => notifyIndexNow([productUrl(productId)]));
+  }
+  await refreshCollage(productId);
+  return NextResponse.json({ ok: true, id: productId, slug: productId });
 }
 
 /** Termék törlése: { id } */
